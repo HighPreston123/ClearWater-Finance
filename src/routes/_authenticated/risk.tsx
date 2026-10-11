@@ -10,6 +10,7 @@ import { RiskSurveyCard } from "@/components/risk/RiskSurveyCard";
 import { FundamentalsCard } from "@/components/risk/FundamentalsCard";
 import { RetirementSimulationCard } from "@/components/risk/RetirementSimulationCard";
 import { WellnessScoreCard } from "@/components/risk/WellnessScoreCard";
+import { ResilienceComparisonCard } from "@/components/risk/ResilienceComparisonCard";
 import { AdvisorMatchCard } from "@/components/risk/AdvisorMatchCard";
 
 export const Route = createFileRoute("/_authenticated/risk")({
@@ -38,6 +39,7 @@ function Risk() {
       <AdvisorMatchCard />
       <CsvSettingsLink section="csv-risk-inputs" title="Your Future risk inputs" text="Emergency fund, cash reserves, debts, bills, goals, time horizon and risk comfort are loaded from a CSV in Settings." />
       <FutureResultSections />
+      <ResilienceComparisonCard />
     </div>
   );
 }

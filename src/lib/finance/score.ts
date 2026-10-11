@@ -5,8 +5,10 @@ import { formatCents, formatPct, monthLabel } from "@/lib/format";
 
 /** Demo rubric. These thresholds are product assumptions, not validated financial standards. */
 export const FACTOR_A_TIERS = [
-  { min: 30, points: 700, label: "30% or higher" },
-  { min: 20, points: 560, label: "20% to below 30%" },
+  { min: 50, points: 700, label: "50% or higher" },
+  { min: 40, points: 630, label: "40% to below 50%" },
+  { min: 30, points: 560, label: "30% to below 40%" },
+  { min: 20, points: 490, label: "20% to below 30%" },
   { min: 10, points: 420, label: "10% to below 20%" },
   { min: 5, points: 280, label: "5% to below 10%" },
   { min: 0, points: 140, label: "0% to below 5%" },
@@ -84,7 +86,7 @@ export function computeHistoricalScore(all: Transaction[], range: DateRange): Sc
     threshold: `Surplus rate ${formatPct(s.surplusRate)} falls in the "${tier.label}" tier → ${tier.points} of ${FACTOR_A_MAX} points.`,
     improve:
       tier.points === FACTOR_A_MAX
-        ? "This factor earned full points. Keeping spending below 70% of income maintains it."
+        ? "This factor earned full points. Keeping spending at or below 50% of income maintains it."
         : `Reaching the next tier in a future month (a higher surplus rate) would earn more points. Lowering adjustable spending or raising income increases the margin.`,
   };
 

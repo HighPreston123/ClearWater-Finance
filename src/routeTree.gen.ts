@@ -15,6 +15,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedIndexRouteImport } from './routes/_authenticated/index'
 import { Route as AuthenticatedAdvisorsRouteImport } from './routes/_authenticated/advisors'
 import { Route as AuthenticatedInvestmentsRouteImport } from './routes/_authenticated/investments'
+import { Route as AuthenticatedMethodologyRouteImport } from './routes/_authenticated/methodology'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedRecurringRouteImport } from './routes/_authenticated/recurring'
 import { Route as AuthenticatedRiskRouteImport } from './routes/_authenticated/risk'
@@ -52,6 +53,12 @@ const AuthenticatedInvestmentsRoute =
   AuthenticatedInvestmentsRouteImport.update({
     id: '/investments',
     path: '/investments',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMethodologyRoute =
+  AuthenticatedMethodologyRouteImport.update({
+    id: '/methodology',
+    path: '/methodology',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
@@ -102,6 +109,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/advisors': typeof AuthenticatedAdvisorsRoute
   '/investments': typeof AuthenticatedInvestmentsRoute
+  '/methodology': typeof AuthenticatedMethodologyRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/recurring': typeof AuthenticatedRecurringRoute
   '/risk': typeof AuthenticatedRiskRoute
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/advisors': typeof AuthenticatedAdvisorsRoute
   '/investments': typeof AuthenticatedInvestmentsRoute
+  '/methodology': typeof AuthenticatedMethodologyRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/recurring': typeof AuthenticatedRecurringRoute
   '/risk': typeof AuthenticatedRiskRoute
@@ -133,6 +142,7 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/advisors': typeof AuthenticatedAdvisorsRoute
   '/_authenticated/investments': typeof AuthenticatedInvestmentsRoute
+  '/_authenticated/methodology': typeof AuthenticatedMethodologyRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/recurring': typeof AuthenticatedRecurringRoute
   '/_authenticated/risk': typeof AuthenticatedRiskRoute
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/advisors'
     | '/investments'
+    | '/methodology'
     | '/onboarding'
     | '/recurring'
     | '/risk'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/advisors'
     | '/investments'
+    | '/methodology'
     | '/onboarding'
     | '/recurring'
     | '/risk'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/_authenticated/advisors'
     | '/_authenticated/investments'
+    | '/_authenticated/methodology'
     | '/_authenticated/onboarding'
     | '/_authenticated/recurring'
     | '/_authenticated/risk'
@@ -242,6 +255,13 @@ declare module '@tanstack/react-router' {
       path: '/investments'
       fullPath: '/investments'
       preLoaderRoute: typeof AuthenticatedInvestmentsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/methodology': {
+      id: '/_authenticated/methodology'
+      path: '/methodology'
+      fullPath: '/methodology'
+      preLoaderRoute: typeof AuthenticatedMethodologyRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/onboarding': {
@@ -306,6 +326,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAdvisorsRoute: typeof AuthenticatedAdvisorsRoute
   AuthenticatedInvestmentsRoute: typeof AuthenticatedInvestmentsRoute
+  AuthenticatedMethodologyRoute: typeof AuthenticatedMethodologyRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedRecurringRoute: typeof AuthenticatedRecurringRoute
   AuthenticatedRiskRoute: typeof AuthenticatedRiskRoute
@@ -318,6 +339,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAdvisorsRoute: AuthenticatedAdvisorsRoute,
   AuthenticatedInvestmentsRoute: AuthenticatedInvestmentsRoute,
+  AuthenticatedMethodologyRoute: AuthenticatedMethodologyRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedRecurringRoute: AuthenticatedRecurringRoute,
   AuthenticatedRiskRoute: AuthenticatedRiskRoute,
