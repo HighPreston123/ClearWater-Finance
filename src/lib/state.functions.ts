@@ -41,9 +41,9 @@ const stateSchema = z.object({
 export const loadUserState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ data: PersistedState } | null> => {
-    await assertMfa(context);
-    const { withOwner, readState } = await import("./tiger.server");
-    const data = await withOwner(context.userId, (tx) => readState(tx, context.userId));
+    const { withMfaRead } = await import("./mfa.server");
+    const { readOwnerState } = await import("./tiger.server");
+    const data = await withMfaRead(context, () => readOwnerState(context.userId));
     return data ? { data: JSON.parse(JSON.stringify(data)) } : null;
   });
 

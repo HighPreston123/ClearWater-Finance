@@ -12,3 +12,13 @@ export async function assertMfa(context: unknown) {
     throw new Error("MFA required: complete two-factor verification");
   }
 }
+
+/**
+ * Read-only variant: runs the MFA check and the owner-scoped read concurrently so the auth round trip
+ * overlaps the database round trip. Nothing is returned unless the MFA check passes. Writes must keep
+ * calling assertMfa before touching data.
+ */
+export async function withMfaRead<T>(context: unknown, read: () => Promise<T>): Promise<T> {
+  const [, data] = await Promise.all([assertMfa(context), read()]);
+  return data;
+}
