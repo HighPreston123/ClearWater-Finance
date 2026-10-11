@@ -88,25 +88,6 @@ function Overview() {
         </div>
       </div>
 
-      <GlassCard>
-        <Collapsible>
-          <CollapsibleTrigger className="flex w-full items-center justify-between rounded font-display font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            What is affecting your profile? <ChevronDown className="h-4 w-4" />
-          </CollapsibleTrigger>
-          <CollapsibleContent className="mt-3 space-y-3">
-            {d.actions.length === 0 ? <p className="text-sm text-muted-foreground">No historical-score deductions to explain for this period.</p> : d.actions.map((a) => (
-              <div key={a.factorId} className="rounded-2xl border bg-card p-4 text-sm">
-                <StatusBadge tone="info">From historical score</StatusBadge>
-                <p className="mt-2 font-semibold">{a.issue}</p>
-                {a.historicalDeduction !== null && <p className="text-muted-foreground">Deduction: {a.historicalDeduction} points</p>}
-                <p className="mt-1"><b>Next step:</b> {a.nextStep}</p>
-                <p className="text-muted-foreground">{a.howItHelps}</p>
-              </div>
-            ))}
-            <Note>Future-risk factors will appear here once that methodology exists.</Note>
-          </CollapsibleContent>
-        </Collapsible>
-      </GlassCard>
 
       <GlassCard>
         <CardTitle>Spending by category</CardTitle>
