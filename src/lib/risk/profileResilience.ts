@@ -11,6 +11,7 @@
  */
 import { computeResilience, PILLAR_WEIGHTS, type PillarId, type ResilienceResult } from "./resilience";
 import type { FinancialSnapshot } from "@/types/risk";
+import { debtBandScoreFromAmount, scoreFoundationsCore } from "./wellness";
 
 export interface ComparisonProfileInput {
   id: string;
@@ -61,6 +62,23 @@ export function profileSnapshot(p: ComparisonProfileInput): FinancialSnapshot {
 export const scoreProfile = (p: ComparisonProfileInput): ResilienceResult =>
   computeResilience({ snapshot: profileSnapshot(p), now: new Date(FIXED_NOW) });
 
+/** Foundations-pillar score of a comparison profile with the same formula the
+ *  survey path uses. Profiles only carry monthly averages: total monthly
+ *  spending stands in for essential expenses (an upper bound, discretionary
+ *  stays 0) and dependable income is unknown — those parts are skipped,
+ *  never treated as zero. */
+export function scoreProfileFoundations(p: ComparisonProfileInput): number | null {
+  const income = n(p.annualIncomeCents), spend = n(p.monthlySpendingCents), savings = n(p.savingsCents), debt = n(p.debtCents);
+  return scoreFoundationsCore({
+    liquidSavings: savings === null ? null : savings / 100,
+    essentialMonthly: spend === null ? null : spend / 100,
+    debtBandScore: debtBandScoreFromAmount(debt === null ? null : debt / 100, debt === 0),
+    grossAnnualIncome: income === null ? null : income / 100,
+    discretionaryMonthly: spend === null ? null : 0,
+    dependableScore: null,
+  });
+}
+
 export interface ComparisonStats {
   version: string;
   total: number;
@@ -75,6 +93,14 @@ export interface ComparisonStats {
   /** Sorted scores for percentile lookup (no ids). */
   sorted: number[];
   pillarAverages: Record<PillarId, number | null>;
+  /** Financial foundations (wellness pillar) aggregates for the same profiles. */
+  foundations: FoundationsStats;
+}
+
+export interface FoundationsStats {
+  scored: number;
+  average: number | null;
+  median: number | null;
 }
 
 const avg = (xs: number[]) => (xs.length ? Math.round((xs.reduce((a, b) => a + b, 0) / xs.length) * 10) / 10 : null);
@@ -89,6 +115,20 @@ export function aggregate(results: ResilienceResult[]): ComparisonStats {
   return {
     version: results[0]?.version ?? "", total: results.length, scored: scores.length, insufficient: results.length - scores.length,
     average: avg(scores), median, min: scores[0] ?? null, max: scores[scores.length - 1] ?? null, histogram, sorted: scores, pillarAverages,
+    foundations: { scored: 0, average: null, median: null },
+  };
+}
+
+/** Full comparison view: resilience scores plus financial-foundations (wellness)
+ *  scores of the same profiles, both from one formula. */
+export function scoreProfilesWithFoundations(inputs: ComparisonProfileInput[]): ComparisonStats {
+  const foundationScores = inputs.map(scoreProfileFoundations).filter((s): s is number => s !== null).sort((a, b) => a - b);
+  const median = foundationScores.length
+    ? (foundationScores.length % 2 ? foundationScores[(foundationScores.length - 1) / 2]! : (foundationScores[foundationScores.length / 2 - 1]! + foundationScores[foundationScores.length / 2]!) / 2)
+    : null;
+  return {
+    ...aggregate(inputs.map(scoreProfile)),
+    foundations: { scored: foundationScores.length, average: avg(foundationScores), median },
   };
 }
 
