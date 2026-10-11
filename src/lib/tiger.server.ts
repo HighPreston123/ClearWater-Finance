@@ -75,21 +75,29 @@ export async function readState(tx: Tx, owner: string): Promise<PersistedState |
 }
 
 /**
- * Sign-in load in a single network round trip: BEGIN (read only, consistent snapshot), least-privilege role,
- * owner context for RLS, the combined read, COMMIT — sent together over the simple query protocol.
- * Same ownership guarantees as withOwner; the owner id is a validated UUID from the verified session.
+ * Read-only owner snapshot in a single network round trip: BEGIN (repeatable read, read only — one consistent
+ * snapshot), least-privilege role, owner context for RLS, the given single-row SELECTs, COMMIT — sent together
+ * over the simple query protocol. Same ownership guarantees as withOwner. SELECTs must not take parameters;
+ * the owner id is a validated UUID from the verified session. Returns one row per SELECT, in order.
  */
-export async function readOwnerState(ownerId: string): Promise<PersistedState | null> {
+export async function ownerSnapshot(ownerId: string, selects: string[]): Promise<any[]> {
   if (!UUID.test(ownerId)) throw new Error("Unauthorized: invalid owner");
   const url = process.env["TIGER_DATABASE_URL"];
   if (!url) throw new DatabaseNotConfiguredError();
   const sql = postgres(url, { ssl: "require", max: 1, prepare: false, fetch_types: false, connect_timeout: 10, idle_timeout: 5, onnotice: () => {} });
   try {
-    const results = (await sql.unsafe(
-      `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL ROLE fin_app; SELECT set_config('app.user_id', '${ownerId}', true); ${stateSql(ownerId)}; COMMIT;`,
-    ).simple()) as unknown as any[][];
-    // Pick the combined read's result by shape (statement results without rows may be omitted).
-    return mapState(results.find((r) => r?.[0] && "settings" in r[0])?.[0]);
+    const script = [
+      "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY",
+      "SET LOCAL ROLE fin_app",
+      `SELECT set_config('app.user_id', '${ownerId}', true) AS _ctx`,
+      ...selects,
+      "COMMIT",
+    ].join(";\n");
+    const results = (await sql.unsafe(script).simple()) as unknown as any[][];
+    // Statements without rows may be omitted from the result list, so select row results by shape.
+    const rows = results.filter((r) => Array.isArray(r) && r[0] && !("_ctx" in r[0])).map((r) => r[0]);
+    if (rows.length !== selects.length) throw new Error("unexpected snapshot shape");
+    return rows;
   } catch (e) {
     const err = e as { code?: string; message?: string };
     console.error("[tiger] query failed", err.code ?? "", String(err.message ?? "").replace(/postgres(ql)?:\/\/\S+/g, "[redacted]"));
@@ -97,6 +105,13 @@ export async function readOwnerState(ownerId: string): Promise<PersistedState | 
   } finally {
     await sql.end({ timeout: 2 });
   }
+}
+
+/** Sign-in load: the combined state read in one round trip. */
+export async function readOwnerState(ownerId: string): Promise<PersistedState | null> {
+  if (!UUID.test(ownerId)) throw new Error("Unauthorized: invalid owner");
+  const [row] = await ownerSnapshot(ownerId, [stateSql(ownerId)]);
+  return mapState(row);
 }
 
 function mapState(row: any): PersistedState | null {
