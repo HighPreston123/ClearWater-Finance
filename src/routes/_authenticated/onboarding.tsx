@@ -145,7 +145,7 @@ function Onboarding() {
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button variant="glass" size="lg" className="h-12" onClick={() => setStep("welcome")}><ArrowLeft aria-hidden /> Back</Button>
-              <Button variant="aero" size="lg" className="h-12 px-8 text-base" onClick={() => { setIndex(0); setStep("quiz"); }}>Start Quiz <ArrowRight aria-hidden /></Button>
+              <Button variant="aero" size="lg" className="h-12 px-8 text-base" onClick={() => setStep("quiz")}>Start Quiz <ArrowRight aria-hidden /></Button>
             </div>
           </section>
         )}
