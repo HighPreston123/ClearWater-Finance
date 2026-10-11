@@ -7,6 +7,7 @@ import type { PortfolioRiskResult } from "@/lib/risk/portfolioRisk";
 import { publishRiskResult } from "@/lib/risk/resultsStore";
 import { CardTitle, GlassCard, Kv, Note, StatusBadge } from "@/components/common/Glass";
 import { Button } from "@/components/ui/button";
+import { CsvMiniLink } from "@/components/common/CsvHelp";
 
 const pct = (x: number | null | undefined, d = 1) => (x === null || x === undefined || !Number.isFinite(x) ? "—" : `${(x * 100).toFixed(d)}%`);
 
@@ -51,10 +52,10 @@ export function PortfolioRiskCard() {
 
   return (
     <GlassCard>
-      <CardTitle right={<Button size="sm" onClick={go} disabled={busy || !positions.length}>{busy ? "Calculating…" : res ? "Recalculate" : "Calculate"}</Button>}>
+      <CardTitle right={<div className="flex flex-wrap items-center gap-2"><CsvMiniLink section="csv-holdings" label="Import holdings CSV" /><Button size="sm" onClick={go} disabled={busy || !positions.length}>{busy ? "Calculating…" : res ? "Recalculate" : "Calculate"}</Button></div>}>
         Portfolio risk
       </CardTitle>
-      {!positions.length && <Note>Add priced stock or fund holdings on the Investments page to measure portfolio risk.</Note>}
+      {!positions.length && <Note>Add priced stock or fund holdings with your investments CSV to measure portfolio risk.</Note>}
       {err && <Note>{err}</Note>}
       {res && res.status !== "ready" && <Note>Not enough data: {res.reason}</Note>}
       {res && res.status === "ready" && (

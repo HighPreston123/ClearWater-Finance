@@ -9,6 +9,7 @@ import type { MonteCarloResult } from "@/lib/risk/monteCarlo";
 import { publishRiskResult } from "@/lib/risk/resultsStore";
 import { CardTitle, GlassCard, Kv, Note, StatusBadge } from "@/components/common/Glass";
 import { Button } from "@/components/ui/button";
+import { CsvMiniLink } from "@/components/common/CsvHelp";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -100,7 +101,7 @@ export function RetirementSimulationCard() {
 
   return (
     <GlassCard>
-      <CardTitle right={<Button size="sm" onClick={go} disabled={busy || !loaded}>{busy ? "Simulating…" : res ? "Run again" : "Run simulation"}</Button>}>
+      <CardTitle right={<div className="flex flex-wrap items-center gap-2"><CsvMiniLink section="csv-holdings" label="Import holdings CSV" /><Button size="sm" onClick={go} disabled={busy || !loaded}>{busy ? "Simulating…" : res ? "Run again" : "Run simulation"}</Button></div>}>
         Retirement simulation
       </CardTitle>
       <p className="mb-4 text-sm text-muted-foreground">
