@@ -8,3 +8,5 @@ ChatGPT Astra (used to create prompt for Lovable)
 Lovable (front-end design and basic website creation)
 Attempted to use TigerCloud to create a database but was not very compatible with Lovable, so it was not used in final product
 Claude Sonnet 5.5 for CSV files
+Alpaca for Stock history
+Nessie for Monte Carlo training and risk simulation data
