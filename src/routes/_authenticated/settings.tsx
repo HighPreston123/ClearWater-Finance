@@ -5,6 +5,7 @@ import { useFinanceStore } from "@/store/FinanceStore";
 import { PageHeader, GlassCard, CardTitle } from "@/components/common/Glass";
 import { DataConnections } from "@/components/settings/DataConnections";
 import { CsvImportCard } from "@/components/settings/CsvImportCard";
+import { RiskInputsForm } from "@/components/risk/RiskInputsForm";
 import { HoldingsImportCard } from "@/components/settings/HoldingsImportCard";
 import { ReferenceDiagnostics } from "@/components/settings/ReferenceDiagnostics";
 import { DeleteAccountCard } from "@/components/settings/DeleteAccountCard";
@@ -32,6 +33,7 @@ function Settings() {
       <DataConnections />
       <CsvImportCard />
       <HoldingsImportCard />
+      <RiskInputsForm />
       <ReferenceDiagnostics />
       <TwoFactorCard />
       <GlassCard>

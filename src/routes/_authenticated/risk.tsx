@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useDerived } from "@/store/useDerived";
 import { PageHeader } from "@/components/common/Glass";
 import { FutureRiskPanel, FutureResultSections } from "@/components/risk/FutureRiskPanel";
-import { RiskInputsForm } from "@/components/risk/RiskInputsForm";
+import { CsvSettingsLink } from "@/components/common/CsvHelp";
 import { PortfolioRiskCard } from "@/components/risk/PortfolioRiskCard";
 import { RiskSurveyCard } from "@/components/risk/RiskSurveyCard";
 import { FundamentalsCard } from "@/components/risk/FundamentalsCard";
@@ -34,7 +34,7 @@ function Risk() {
       <FundamentalsCard />
       <RetirementSimulationCard />
       <AdvisorMatchCard />
-      <RiskInputsForm />
+      <CsvSettingsLink section="csv-risk-inputs" title="Your Future risk inputs" text="Emergency fund, cash reserves, debts, bills, goals, time horizon and risk comfort are loaded from a CSV in Settings." />
       <FutureResultSections />
     </div>
   );

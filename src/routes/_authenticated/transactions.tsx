@@ -4,7 +4,7 @@ import { Undo2 } from "lucide-react";
 import { useDerived } from "@/store/useDerived";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { PageHeader, GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
-import { CsvImportCard } from "@/components/settings/CsvImportCard";
+import { CsvSettingsLink } from "@/components/common/CsvHelp";
 import { ManualTransactionCard } from "@/components/transactions/ManualTransactionCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -149,7 +149,7 @@ function TransactionsPage() {
       </GlassCard>
 
       <ManualTransactionCard />
-      <CsvImportCard />
+      <CsvSettingsLink section="csv-transactions" title="Import transactions" text="Upload your bank or card statement CSV in Settings. It explains each column and where to download it." />
     </div>
   );
 }
