@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { QUIZ_QUESTIONS, missingQuestions, sanitizeAnswers, type QuizAnswers } from "@/lib/onboarding/quiz";
 import { completeOnboarding, saveOnboardingProgress } from "@/lib/onboarding.functions";
-import { clearOnboardingStateCache, fetchOnboardingState } from "@/lib/onboarding/stateCache";
+import { fetchOnboardingState, markOnboardingCompleted } from "@/lib/onboarding/stateCache";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   head: () => ({
@@ -51,7 +51,7 @@ function Onboarding() {
       let restored: QuizAnswers = {};
       try { restored = sanitizeAnswers(JSON.parse(localStorage.getItem(LOCAL_KEY(user.id)) ?? "{}")); } catch { /* ignore */ }
       try {
-        const s = await fetchOnboardingState();
+        const s = await fetchOnboardingState(user.id);
         if (s.status === "completed") {
           await supabase.auth.updateUser({ data: { onboarding_pending: false } });
           localStorage.removeItem(LOCAL_KEY(user.id));
@@ -87,7 +87,7 @@ function Onboarding() {
       if (r.status === "missing") { setMissing(r.missing); setIndex(r.missing[0]!); return; }
       await supabase.auth.updateUser({ data: { onboarding_pending: false } });
       if (uid) localStorage.removeItem(LOCAL_KEY(uid));
-      clearOnboardingStateCache();
+      if (uid) markOnboardingCompleted(uid);
       setStep("done");
     } catch {
       setError("We couldn't save your answers just now. Your progress is kept — please try again.");
