@@ -1,3 +1,5 @@
+import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
+import { transactionsAudioText } from "@/lib/finance/pageAudioText";
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Undo2 } from "lucide-react";
@@ -53,7 +55,8 @@ function TransactionsPage() {
         title="Transactions"
         subtitle={`Showing ${filtered.length} of ${d.inRange.length} transaction(s) for ${d.label}.`}
         right={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <AudioSummaryControls text={transactionsAudioText({ periodLabel: d.label, summary: d.summary, shown: filtered.length, total: d.inRange.length })} />
             <StatusBadge tone="info">
               {store.transactionSource === "csv" ? "Your CSV data" : store.transactionSource === "nessie" ? "Connected data" : "Sample data"}
             </StatusBadge>
