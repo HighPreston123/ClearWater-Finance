@@ -5,6 +5,7 @@ import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { cloudStorageAdapter } from "@/services/storage/cloudStorageAdapter";
 import { recordLogin } from "@/lib/state.functions";
+import { clearOnboardingStateCache } from "@/lib/onboarding/stateCache";
 import type { Category, DateRange, RecurringOverride, SavingsScenarioSettings, Transaction } from "@/types/finance";
 import type { Holding, InvestmentAccount } from "@/types/investments";
 import type { ManualFinancialInputs } from "@/types/risk";
@@ -65,6 +66,8 @@ export type SyncStatus = "idle" | "loading" | "synced" | "saving" | "load_error"
 interface Store extends PersistedState {
   range: DateRange;
   hydrated: boolean;
+  /** Signed-in user id (from the local session) — used to scope cached queries. */
+  userId: string | null;
   /** Cloud (TigerData) sync state. On load_error, saving is paused so stale/sample data never overwrites saved data. */
   syncStatus: SyncStatus;
   syncError: string | null;
@@ -284,6 +287,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       ...state,
       range,
       hydrated,
+      userId,
       syncStatus,
       syncError,
       retrySync: () => void syncFromCloud(),
@@ -300,10 +304,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       updateHoldingPrices: (prices) =>
         setState((s) => {
           if (!Object.keys(prices).length) return s;
-          return { ...s, holdings: s.holdings.map((h) => {
+          let changed = false;
+          const holdings = s.holdings.map((h) => {
             const p = h.symbol ? prices[h.symbol.toUpperCase()] : undefined;
-            return p && Number(p.price) > 0 ? { ...h, latestPrice: p.price, priceTimestamp: p.ts } : h;
-          }) };
+            if (!p || !(Number(p.price) > 0) || (h.latestPrice === p.price && h.priceTimestamp === p.ts)) return h;
+            changed = true;
+            return { ...h, latestPrice: p.price, priceTimestamp: p.ts };
+          });
+          // Same prices and timestamps → keep the existing state (no re-render, no save).
+          return changed ? { ...s, holdings } : s;
         }),
       updateManual: (patch) => setState((s) => ({ ...s, manual: { ...s.manual, ...patch, updatedAt: new Date().toISOString() } })),
       setSavings: (sv) => setState((s) => ({ ...s, savings: sv })),
@@ -345,7 +354,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         setState(initialState());
       },
     }),
-    [state, range, hydrated, undoStack, recategorize, undo, syncStatus, syncError, syncFromCloud],
+    [state, range, hydrated, userId, undoStack, recategorize, undo, syncStatus, syncError, syncFromCloud],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
