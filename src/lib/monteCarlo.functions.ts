@@ -32,9 +32,7 @@ export const runRetirementSimulation = createServerFn({ method: "POST" })
       return { status: "insufficient_data", missing: ["ages: retirement and horizon must be after current age"] };
     }
     const result = runMonteCarlo(data);
-    const { withOwner } = await import("./tiger.server");
-    await withOwner(context.userId, async (tx) => {
-      await tx`INSERT INTO fin.monte_carlo_runs (user_id, config, results) VALUES (${context.userId}, ${tx.json(data)}, ${tx.json(result as never)})`;
-    });
+    const { check } = await import("./db.server");
+    check(await context.supabase.from("fin_monte_carlo_runs").insert({ user_id: context.userId, config: data as never, results: result as never }), "monte_carlo_save");
     return { status: "ok", result };
   });
