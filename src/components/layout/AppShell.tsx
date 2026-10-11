@@ -1,4 +1,4 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, type ReactNode } from "react";
@@ -87,8 +87,25 @@ function UserChip() {
   );
 }
 
+/** After the first page shows, quietly download every tab's code so first clicks are instant. */
+function useWarmTabs() {
+  const router = useRouter();
+  useEffect(() => {
+    const idle = (cb: () => void) =>
+      "requestIdleCallback" in window ? window.requestIdleCallback(cb, { timeout: 3000 }) : window.setTimeout(cb, 1500);
+    const id = idle(() => {
+      for (const { to } of NAV) router.loadRouteChunk(router.looseRoutesById[to === "/" ? "/_authenticated/" : `/_authenticated${to}`]).catch(() => {});
+    });
+    return () => {
+      if ("cancelIdleCallback" in window) window.cancelIdleCallback(id as number);
+      else clearTimeout(id as number);
+    };
+  }, [router]);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  useWarmTabs();
   return (
     <div className="aero-sky bubbles min-h-screen">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-card focus:px-4 focus:py-2">Skip to content</a>
