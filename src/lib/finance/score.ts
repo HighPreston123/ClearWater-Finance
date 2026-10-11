@@ -86,7 +86,7 @@ export function computeHistoricalScore(all: Transaction[], range: DateRange): Sc
     threshold: `Surplus rate ${formatPct(s.surplusRate)} falls in the "${tier.label}" tier → ${tier.points} of ${FACTOR_A_MAX} points.`,
     improve:
       tier.points === FACTOR_A_MAX
-        ? "This factor earned full points. Keeping spending below 70% of income maintains it."
+        ? "This factor earned full points. Keeping spending at or below 50% of income maintains it."
         : `Reaching the next tier in a future month (a higher surplus rate) would earn more points. Lowering adjustable spending or raising income increases the margin.`,
   };
 
