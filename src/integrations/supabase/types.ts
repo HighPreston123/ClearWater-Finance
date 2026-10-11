@@ -903,6 +903,7 @@ export type Database = {
     Functions: {
       fin_analytics: { Args: { p_score_type: string }; Returns: Json }
       fin_delete_my_data: { Args: never; Returns: undefined }
+      fin_mfa_ok: { Args: never; Returns: boolean }
       fin_owner_daily_activity: {
         Args: { p_end: string; p_start: string }
         Returns: {

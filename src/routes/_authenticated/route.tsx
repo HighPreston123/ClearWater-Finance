@@ -1,5 +1,6 @@
 import { createFileRoute, isRedirect, Outlet, redirect, useRouterState } from "@tanstack/react-router";
 import { AppShell } from "@/components/layout/AppShell";
+import { MfaChallenge } from "@/components/auth/MfaChallenge";
 import { supabase } from "@/integrations/supabase/client";
 import { fetchOnboardingState } from "@/lib/onboarding/stateCache";
 
@@ -12,9 +13,13 @@ import { fetchOnboardingState } from "@/lib/onboarding/stateCache";
  * navigation); every protected server function still verifies the token
  * itself, so this gate only decides what UI to show.
  *
+ * Two-factor: if the account has an authenticator but this session hasn't
+ * passed the code step, only the code screen renders (server functions and
+ * database rules refuse data until then, too).
+ *
  * Onboarding routing is database-backed: any account without a completed
- * quiz row in TigerData is sent to /onboarding. The result is cached per
- * user (see stateCache) so it's checked once per session, not per click.
+ * quiz row is sent to /onboarding. The result is cached per user (see
+ * stateCache) so it's checked once per session, not per click.
  * The `onboarding_pending` metadata flag is only a fast path set at email
  * sign-up. If the status check fails, the gate fails open.
  */
@@ -24,7 +29,9 @@ export const Route = createFileRoute("/_authenticated")({
     const { data } = await supabase.auth.getSession();
     const user = data.session?.user;
     if (!user) throw redirect({ to: "/auth" });
-    if (location.pathname === "/onboarding") return;
+    const { data: aal } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (aal && aal.nextLevel === "aal2" && aal.currentLevel !== "aal2") return { mfaNeeded: true };
+    if (location.pathname === "/onboarding") return { mfaNeeded: false };
     if (user.user_metadata?.["onboarding_pending"] === true) {
       throw redirect({ to: "/onboarding" });
     }
@@ -37,12 +44,15 @@ export const Route = createFileRoute("/_authenticated")({
       // Status check failed (e.g. database unreachable) — fail open.
       console.error("[gate] onboarding status check failed", e);
     }
+    return { mfaNeeded: false };
   },
   component: GateLayout,
 });
 
 function GateLayout() {
+  const { mfaNeeded } = Route.useRouteContext();
   const path = useRouterState({ select: (s) => s.location.pathname });
+  if (mfaNeeded) return <MfaChallenge />;
   if (path === "/onboarding") return <Outlet />;
   return (
     <AppShell>

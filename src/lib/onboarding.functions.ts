@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuthWithMfa } from "@/lib/mfa-middleware";
 import { QUIZ_VERSION, missingQuestions, sanitizeAnswers, type QuizAnswers } from "@/lib/onboarding/quiz";
 
 export interface OnboardingState { status: "not_started" | "in_progress" | "completed"; answers: QuizAnswers; completedAt: string | null }
@@ -14,7 +14,7 @@ async function readQuiz(db: any, userId: string) {
 }
 
 export const getOnboardingState = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .handler(async ({ context }): Promise<OnboardingState> => {
     const r = await readQuiz(context.supabase, context.userId);
     if (!r) return { status: "not_started", answers: {}, completedAt: null };
@@ -23,7 +23,7 @@ export const getOnboardingState = createServerFn({ method: "GET" })
 
 /** Saves partial progress (one row per user; upsert never duplicates). No-op once completed. */
 export const saveOnboardingProgress = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .inputValidator(answersInput)
   .handler(async ({ data, context }) => {
     const existing = await readQuiz(context.supabase, context.userId);
@@ -37,7 +37,7 @@ export const saveOnboardingProgress = createServerFn({ method: "POST" })
 
 /** Final submission: all 20 answers required; marks completed exactly once. */
 export const completeOnboarding = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .inputValidator(answersInput)
   .handler(async ({ data, context }): Promise<{ status: "completed" } | { status: "missing"; missing: number[] }> => {
     const missing = missingQuestions(data.answers);
