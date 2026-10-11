@@ -1,3 +1,5 @@
+import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
+import { recurringAudioText } from "@/lib/finance/pageAudioText";
 import { createFileRoute } from "@tanstack/react-router";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { useDerived } from "@/store/useDerived";
@@ -27,7 +29,7 @@ function Recurring() {
   const other = d.all.filter((t) => t.type === "expense" && !recurringIds.has(t.id));
   return (
     <div className="space-y-6">
-      <PageHeader title="Recurring expenses" subtitle="Detection uses all available transaction history, not just the selected range." right={<CsvMiniLink section="csv-transactions" label="Import transactions CSV" />} />
+      <PageHeader title="Recurring expenses" subtitle="Detection uses all available transaction history, not just the selected range." right={<div className="flex flex-col items-end gap-2"><AudioSummaryControls text={recurringAudioText({ series: d.activeRecurring, monthlyCents: d.recurringMonthly })} /><CsvMiniLink section="csv-transactions" label="Import transactions CSV" /></div>} />
       <div className="grid gap-4 sm:grid-cols-3">
         <Metric label="Recurring series" value={String(d.activeRecurring.length)} sub="Counts series, not payments" />
         <Metric label="Monthly equivalent" value={formatCents(d.recurringMonthly)} sub="Weekly × 52 ÷ 12" />

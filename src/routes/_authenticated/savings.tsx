@@ -1,3 +1,5 @@
+import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
+import { savingsAudioText } from "@/lib/finance/pageAudioText";
 import { createFileRoute } from "@tanstack/react-router";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { useDerived } from "@/store/useDerived";
@@ -29,7 +31,7 @@ function Savings() {
   const sc = computeSavingsScenarios(transactions, months, savings);
   return (
     <div className="space-y-6">
-      <PageHeader title="Savings planner" subtitle={`Baselines average complete months: ${months.map((m) => monthLabel(m)).join(", ")}.`} />
+      <PageHeader title="Savings planner" subtitle={`Baselines average complete months: ${months.map((m) => monthLabel(m)).join(", ")}.`} right={<AudioSummaryControls text={savingsAudioText({ recommendation: d.recommendation })} />} />
       <PrimaryRecommendationCard rec={d.recommendation} />
       <GlassCard>
         <CardTitle>Reduction scenarios</CardTitle>
