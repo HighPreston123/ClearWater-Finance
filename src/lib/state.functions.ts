@@ -5,8 +5,8 @@ import type { PersistedState } from "@/services/storage/storageAdapter";
 import type { OnboardingState } from "./onboarding.functions";
 
 /**
- * Server-backed persistence of each signed-in user's financial state in TigerData.
- * The owner id always comes from the verified session (requireSupabaseAuth), never from input.
+ * Server-backed persistence of each signed-in user's financial state in the app database.
+ * Queries run with the caller's verified session (RLS: user_id = auth.uid()), never with client-supplied ids.
  * If the user has a verified MFA factor, the session must be at aal2.
  */
 
@@ -43,8 +43,8 @@ export const loadUserState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ data: PersistedState } | null> => {
     const { withMfaRead } = await import("./mfa.server");
-    const { readOwnerState } = await import("./tiger.server");
-    const data = await withMfaRead(context, () => readOwnerState(context.userId));
+    const { readOwnerState } = await import("./db.server");
+    const data = await withMfaRead(context, () => readOwnerState(context.supabase));
     return data ? { data: JSON.parse(JSON.stringify(data)) } : null;
   });
 
@@ -53,9 +53,9 @@ export const loadSession = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { withMfaRead } = await import("./mfa.server");
-    const { readOwnerSession } = await import("./tiger.server");
+    const { readOwnerSession } = await import("./db.server");
     const { sanitizeAnswers } = await import("./onboarding/quiz");
-    const { state, quiz } = await withMfaRead(context, () => readOwnerSession(context.userId));
+    const { state, quiz } = await withMfaRead(context, () => readOwnerSession(context.supabase));
     const onboarding: OnboardingState = quiz
       ? { status: quiz.status, answers: sanitizeAnswers(quiz.answers), completedAt: quiz.completed_at ? new Date(quiz.completed_at).toISOString() : null }
       : { status: "not_started", answers: {}, completedAt: null };
@@ -73,15 +73,14 @@ export const saveUserState = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => patchSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertMfa(context);
-    const { withOwner, writeState } = await import("./tiger.server");
-    const { transactionsChanged } = await withOwner(context.userId, (tx) =>
-      writeState(tx, context.userId, data as unknown as import("./tiger.server").StatePatch));
-    // Analytics and scores depend only on transactions — skip the refresh when none changed.
+    const { writeState } = await import("./db.server");
+    const { transactionsChanged } = await writeState(context.supabase, data as unknown as import("./db.server").StatePatch);
+    // Analytics and scores depend only on transactions — skip the rescore when none changed.
     if (!transactionsChanged) return { ok: true as const, analytics: "skipped" as const };
-    // Saved. Now refresh the affected TigerData summaries and rescore; a failure here never undoes the save.
+    // Saved. Now rescore; a failure here never undoes the save.
     try {
       const { afterTransactionsChanged } = await import("./analytics.server");
-      await afterTransactionsChanged(context.userId);
+      await afterTransactionsChanged(context.supabase);
       return { ok: true as const, analytics: "refreshed" as const };
     } catch (e) {
       console.error("[analytics] post-save refresh failed", (e as Error).message);
@@ -91,7 +90,8 @@ export const saveUserState = createServerFn({ method: "POST" })
 
 /**
  * Records a successful login: upserts the caller's profile from the VERIFIED auth user
- * (id, email, provider name). Takes no client input. Preserves created_at; bumps last_login_at.
+ * (id, email, provider name). Takes no client input. Preserves created_at and existing values; bumps last_login_at.
+ * Written server-side only (users cannot edit this row directly).
  */
 export const recordLogin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -106,14 +106,12 @@ export const recordLogin = createServerFn({ method: "POST" })
     const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
     const rawName = meta["full_name"] ?? meta["name"];
     const displayName = typeof rawName === "string" && rawName.trim() ? rawName.trim().slice(0, 200) : null;
-    const { withOwner } = await import("./tiger.server");
-    await withOwner(context.userId, async (tx) => {
-      await tx`INSERT INTO fin.user_profiles (auth_user_id, email, display_name, last_login_at)
-        VALUES (${context.userId}, ${email}, ${displayName}, now())
-        ON CONFLICT (auth_user_id) DO UPDATE SET
-          email = COALESCE(EXCLUDED.email, fin.user_profiles.email),
-          display_name = COALESCE(EXCLUDED.display_name, fin.user_profiles.display_name),
-          last_login_at = now()`;
-    });
+    const { adminDb, check } = await import("./db.server");
+    const admin = await adminDb();
+    // Only non-null values are sent, so existing email/name are kept when the provider omits them.
+    check(await admin.from("fin_user_profiles").upsert({
+      auth_user_id: context.userId, last_login_at: new Date().toISOString(),
+      ...(email ? { email } : {}), ...(displayName ? { display_name: displayName } : {}),
+    }, { onConflict: "auth_user_id" }), "record_login");
     return { ok: true as const };
   });
