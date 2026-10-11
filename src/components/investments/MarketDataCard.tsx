@@ -66,6 +66,15 @@ export function MarketDataCard() {
     [latestQ.data],
   );
 
+  // Owned symbols the feed cannot quote (some mutual funds, e.g. FXAIX) drop out once the lookup
+  // confirms there is no price — they would only ever read "No price available". Watchlist symbols
+  // always stay so they can still be removed, and nothing is hidden while a lookup is pending.
+  const listed = useMemo(
+    () => all.filter((s) => watch.includes(s) || !latest[s] || (latest[s]!.status === "ok" && !!latest[s]!.price)),
+    [all, watch, latest],
+  );
+
+
   // Only holdings the user already owns are re-priced; unsupported symbols keep no price (never zero).
   // updateHoldingPrices returns the same state when prices/timestamps are unchanged.
   useEffect(() => {
@@ -120,7 +129,7 @@ export function MarketDataCard() {
       </div>
       {error && <p className="mt-2 text-sm text-destructive">{error}</p>}
       <div className="mt-3 divide-y divide-border/50">
-        {all.map((s) => {
+        {listed.map((s) => {
           const q = latest[s];
           return (
             <div key={s} className="flex flex-wrap items-center justify-between gap-2 py-2">
