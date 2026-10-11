@@ -1,3 +1,6 @@
+import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
+import { investmentsAudioText } from "@/lib/finance/pageAudioText";
+import { formatMicros as fmtMicrosAudio } from "@/lib/format";
 import { createFileRoute } from "@tanstack/react-router";
 import { CsvSettingsLink } from "@/components/common/CsvHelp";
 import { useFinanceStore } from "@/store/FinanceStore";
@@ -26,7 +29,7 @@ function Investments() {
   const portfolio = usePortfolio();
   return (
     <div className="space-y-6">
-      <PageHeader title="Investments" subtitle="Your accounts and holdings. Values reflect each displayed valuation date." />
+      <PageHeader title="Investments" subtitle="Your accounts and holdings. Values reflect each displayed valuation date." right={<AudioSummaryControls text={investmentsAudioText({ accountCount: accounts.length, holdingCount: holdings.length, total: fmtMicrosAudio(portfolio.totalMicros), partial: portfolio.partial })} />} />
       <CsvSettingsLink section="csv-holdings" title="Import your investments" text="Upload a brokerage CSV of your holdings in Settings. It explains each column and where to download it." />
       <GlassCard>
         <div className="flex flex-wrap items-end justify-between gap-3">

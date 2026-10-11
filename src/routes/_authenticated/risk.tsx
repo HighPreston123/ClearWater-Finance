@@ -1,3 +1,5 @@
+import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
+import { riskAudioText } from "@/lib/finance/pageAudioText";
 import { createFileRoute } from "@tanstack/react-router";
 import { useDerived } from "@/store/useDerived";
 import { PageHeader } from "@/components/common/Glass";
@@ -26,7 +28,7 @@ function Risk() {
   const { risk } = useDerived();
   return (
     <div className="space-y-6">
-      <PageHeader title="Future risk" subtitle="Covers your whole financial situation, including investments — not just stocks." />
+      <PageHeader title="Future risk" subtitle="Covers your whole financial situation, including investments — not just stocks." right={<AudioSummaryControls text={riskAudioText({ risk })} />} />
       <FutureRiskPanel risk={risk} />
       <WellnessScoreCard />
       <PortfolioRiskCard />

@@ -1,3 +1,5 @@
+import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
+import { SETTINGS_AUDIO_TEXT } from "@/lib/finance/pageAudioText";
 import { createFileRoute } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { RotateCcw } from "lucide-react";
@@ -29,7 +31,7 @@ function Settings() {
   const { resetDemo } = useFinanceStore();
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" />
+      <PageHeader title="Settings" right={<AudioSummaryControls text={SETTINGS_AUDIO_TEXT} />} />
       <DataConnections />
       <CsvImportCard />
       <HoldingsImportCard />
