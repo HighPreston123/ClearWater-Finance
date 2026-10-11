@@ -7,6 +7,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/s
 import { Button } from "@/components/ui/button";
 import { RangePicker } from "@/components/common/RangePicker";
 import { cn } from "@/lib/utils";
+import { AquaAmbience } from "@/components/layout/AquaAmbience";
 
 const NAV = [
   { to: "/", label: "Overview", icon: LayoutDashboard },
@@ -103,7 +104,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   useWarmTabs();
   return (
-    <div className="aero-sky bubbles min-h-screen">
+    <div className="aero-sky bubbles aqua-cursor min-h-screen">
+      <AquaAmbience />
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-card focus:px-4 focus:py-2">Skip to content</a>
       <div className="relative z-10 mx-auto flex max-w-[1400px] gap-6 p-3 md:p-6">
         <aside className="glass-surface sticky top-6 hidden h-[calc(100vh-3rem)] w-64 shrink-0 flex-col gap-6 rounded-3xl p-4 lg:flex">
