@@ -63,13 +63,9 @@ function UserChip() {
   const queryClient = useQueryClient();
   const [email, setEmail] = useState<string | null>(null);
 
+  // Single auth subscriber lives in FinanceProvider; the shell remounts on account change via the gate.
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setEmail(data.session?.user.email ?? null));
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event !== "SIGNED_IN" && event !== "SIGNED_OUT") return;
-      supabase.auth.getSession().then(({ data: s }) => setEmail(s.session?.user.email ?? null));
-    });
-    return () => data.subscription.unsubscribe();
   }, []);
 
   if (!email) return null;
