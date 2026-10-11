@@ -57,11 +57,9 @@ function Onboarding() {
           navigate({ to: "/", replace: true });
           return;
         }
-        restored = { ...restored, ...s.answers };
+      restored = { ...restored, ...s.answers };
       } catch { /* offline: continue with local progress */ }
       setAnswers(restored);
-      const firstGap = missingQuestions(restored)[0];
-      setIndex(firstGap ?? TOTAL - 1);
       setStep(Object.keys(restored).length ? "quiz" : "welcome");
     })();
   }, [navigate]);
