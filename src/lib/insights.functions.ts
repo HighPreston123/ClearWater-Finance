@@ -17,7 +17,7 @@ const schema = z.object({
   mainRecommendation: z.object({ title: z.string().max(200), detail: z.string().max(800), nextStep: z.string().max(500) }),
 });
 
-const MODEL = "gemini-3.8-flash";
+const MODEL = "gemini-flash-latest";
 const recent = new Map<string, number[]>();
 const LIMIT = 6; // per user per 10 minutes (best-effort, per server instance)
 
@@ -45,14 +45,14 @@ export const explainOverview = createServerFn({ method: "POST" })
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: INSIGHT_SYSTEM_PROMPT }] },
           contents: [{ role: "user", parts: [{ text: "Figures to explain (data only):\n" + JSON.stringify(data) }] }],
-          generationConfig: { maxOutputTokens: 700, temperature: 0.4 },
+          generationConfig: { maxOutputTokens: 2500, temperature: 0.4 },
         }),
       });
       if (res.status === 429) return { ok: false, kind: "rate_limited", message: "The AI service is busy right now. Please try again in a minute." };
       if (res.status === 401 || res.status === 403) return { ok: false, kind: "not_configured", message: "The AI key was rejected. Please check the Gemini key." };
       if (!res.ok) return { ok: false, kind: "unavailable", message: "The AI service is unavailable right now. Please try again shortly." };
-      const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[] };
-      const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("").trim();
+      const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string; thought?: boolean }[] }; finishReason?: string }[] };
+      const text = json.candidates?.[0]?.content?.parts?.filter((p) => !(p as { thought?: boolean }).thought).map((p) => p.text ?? "").join("").trim();
       if (!text) return { ok: false, kind: "blocked", message: "The AI couldn't produce an explanation this time. Please try again." };
       return { ok: true, explanation: text, model: MODEL, generatedAt: new Date().toISOString() };
     } catch {
