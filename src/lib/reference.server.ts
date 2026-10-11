@@ -66,3 +66,11 @@ export async function readProfileMatches(db: Db, profileId: string) {
   const rows = (check(await db.from("fin_profile_advisor_matches").select("advisor_id, shared_categories").eq("profile_id", profileId).order("advisor_id"), "profile_matches") ?? []) as any[];
   return rows.map((r) => ({ advisorId: r.advisor_id as string, sharedCategories: r.shared_categories as string[] }));
 }
+
+/** Raw financial fields of the fictional comparison profiles — server-only; callers must return aggregates only. */
+export async function readComparisonProfileInputs(db: Db) {
+  const rows = (check(await db.from("fin_comparison_profiles")
+    .select("id, annual_income_cents, monthly_spending_cents, savings_cents, debt_cents, debt_breakdown, investments_cents"), "cmp_inputs") ?? []) as any[];
+  return rows.map((r) => ({ id: r.id, annualIncomeCents: r.annual_income_cents, monthlySpendingCents: r.monthly_spending_cents,
+    savingsCents: r.savings_cents, debtCents: r.debt_cents, debtBreakdown: r.debt_breakdown, investmentsCents: r.investments_cents }));
+}
