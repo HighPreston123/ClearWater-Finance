@@ -8,6 +8,7 @@ import { CsvImportCard } from "@/components/settings/CsvImportCard";
 import { HoldingsImportCard } from "@/components/settings/HoldingsImportCard";
 import { ReferenceDiagnostics } from "@/components/settings/ReferenceDiagnostics";
 import { DeleteAccountCard } from "@/components/settings/DeleteAccountCard";
+import { TwoFactorCard } from "@/components/settings/TwoFactorCard";
 import { Button } from "@/components/ui/button";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
@@ -32,6 +33,7 @@ function Settings() {
       <CsvImportCard />
       <HoldingsImportCard />
       <ReferenceDiagnostics />
+      <TwoFactorCard />
       <GlassCard>
         <CardTitle>Clear data</CardTitle>
         <p className="text-sm">Clearing removes all your transactions, holdings, and manual inputs so you can start from a blank slate.</p>
