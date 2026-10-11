@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { useDerived } from "@/store/useDerived";
 import { PageHeader, GlassCard, Note, StatusBadge } from "@/components/common/Glass";
+import { CsvMiniLink } from "@/components/common/CsvHelp";
 import { Metric } from "@/components/common/Metric";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCents } from "@/lib/format";

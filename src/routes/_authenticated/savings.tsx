@@ -4,6 +4,7 @@ import { useDerived } from "@/store/useDerived";
 import { PageHeader, GlassCard, CardTitle, Note } from "@/components/common/Glass";
 import { Slider } from "@/components/ui/slider";
 import { EmergencyFundFields, GoalsFields } from "@/components/risk/RiskInputsForm";
+import { CsvMiniLink } from "@/components/common/CsvHelp";
 import { PrimaryRecommendationCard } from "@/components/score/PrimaryRecommendationCard";
 import { computeSavingsScenarios } from "@/lib/finance/savings";
 import { datasetCompleteMonths } from "@/lib/finance/dates";

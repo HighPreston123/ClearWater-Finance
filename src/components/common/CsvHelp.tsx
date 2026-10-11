@@ -39,18 +39,25 @@ export function CsvGuide({ columns, whereToFind }: { columns: CsvColumn[]; where
 /** Button card that sends the user to the matching CSV import on the Settings page. */
 export function CsvSettingsLink({ section, title, text }: { section: CsvSection; title: string; text: string }) {
   return (
-    <GlassCard className="flex flex-wrap items-center justify-between gap-3">
+    <GlassCard className="flex flex-wrap items-center justify-between gap-3 p-4">
       <div>
-        <p className="font-display text-base font-bold">{title}</p>
-        <p className="text-sm text-muted-foreground">{text}</p>
+        <p className="font-display text-sm font-bold">{title}</p>
+        <p className="text-xs text-muted-foreground">{text}</p>
       </div>
-      <Link
-        to="/settings"
-        hash={section}
-        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
-      >
-        <FileUp className="h-3.5 w-3.5" aria-hidden /> Import CSV
-      </Link>
+      <CsvMiniLink section={section} />
     </GlassCard>
+  );
+}
+
+/** Small inline button that jumps to the matching CSV import on the Settings page. */
+export function CsvMiniLink({ section, label = "Import CSV" }: { section: CsvSection; label?: string }) {
+  return (
+    <Link
+      to="/settings"
+      hash={section}
+      className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary hover:bg-primary/20"
+    >
+      <FileUp className="h-3 w-3" aria-hidden /> {label}
+    </Link>
   );
 }
