@@ -189,7 +189,7 @@ function ScoreTimeline({ current, revisions }: { current: ScoreRevision[]; revis
               <LineChart data={data} onClick={(e) => { const p = (e as { activePayload?: { payload: { period: string } }[] })?.activePayload?.[0]?.payload; if (p) setSel(p.period); }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" vertical={false} />
                 <XAxis dataKey="label" stroke="var(--muted-foreground)" fontSize={12} />
-                <YAxis domain={[0, 100]} stroke="var(--muted-foreground)" fontSize={12} width={45} />
+                <YAxis domain={[0, 1000]} stroke="var(--muted-foreground)" fontSize={12} width={45} />
                 <Tooltip />
                 <Line type="monotone" dataKey="Score" stroke="var(--primary)" strokeWidth={2} dot={{ r: 5 }} activeDot={{ r: 7 }} connectNulls={false} isAnimationActive={false} />
               </LineChart>

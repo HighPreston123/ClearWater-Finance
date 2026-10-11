@@ -35,7 +35,7 @@ export function buildAudioSummaryText(p: AudioSummaryInput): string {
     parts.push(`You also moved ${formatCentsShort(s.savingsTransfers)} to savings and contributed ${formatCentsShort(s.investmentContributions)} to investments. Those are transfers, not spending.`);
   }
   if (p.score.status === "ok") {
-    parts.push(`Your historical cash-flow score for ${monthLabel(p.score.month, true)} is ${p.score.score} out of 100, rated ${p.score.label}.`);
+    parts.push(`Your historical cash-flow score for ${monthLabel(p.score.month, true)} is ${p.score.score} out of 1,000, rated ${p.score.label}.`);
   } else {
     parts.push(`A cash-flow score isn't available yet: ${p.score.message}`);
   }
