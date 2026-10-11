@@ -91,15 +91,11 @@ function UserChip() {
 function useWarmTabs() {
   const router = useRouter();
   useEffect(() => {
-    const idle = (cb: () => void) =>
-      "requestIdleCallback" in window ? window.requestIdleCallback(cb, { timeout: 3000 }) : window.setTimeout(cb, 1500);
-    const id = idle(() => {
-      for (const { to } of NAV) router.loadRouteChunk(router.looseRoutesById[to === "/" ? "/_authenticated/" : `/_authenticated${to}`]).catch(() => {});
-    });
-    return () => {
-      if ("cancelIdleCallback" in window) window.cancelIdleCallback(id as number);
-      else clearTimeout(id as number);
-    };
+    // Tab pages have no data loaders, so preloading only fetches their code.
+    const t = setTimeout(() => {
+      for (const { to } of NAV) router.preloadRoute({ to }).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
   }, [router]);
 }
 
