@@ -109,39 +109,77 @@ export function scoreFundamentalsPillar(fundamentals: FundamentalMetrics[] | nul
   return { ...base, score, detail: `Average across ${perHolding.length} holding(s) with usable filing data.` };
 }
 
+export interface FoundationsInputs {
+  /** Liquid savings (cash) in dollars; null when unknown. */
+  liquidSavings: number | null;
+  /** Essential monthly expenses in dollars; null when unknown. */
+  essentialMonthly: number | null;
+  /** Debt-band score 0–100 (s09 bands); null when debt is unknown. */
+  debtBandScore: number | null;
+  /** Annual gross income in dollars; null when unknown. */
+  grossAnnualIncome: number | null;
+  /** Monthly discretionary spending in dollars; null when unknown. */
+  discretionaryMonthly: number | null;
+  /** Dependable-income score 0–100 (s10 bands); null when unknown. */
+  dependableScore: number | null;
+}
+
+/** Shared math for the financial foundations pillar — the survey path and the
+ *  100 comparison profiles both call this so there is exactly one formula.
+ *  Parts with unknown inputs are skipped (never treated as zero) and the
+ *  score is the plain average of the parts that have data. */
+export function scoreFoundationsCore(i: FoundationsInputs): number | null {
+  const parts: number[] = [];
+  if (i.liquidSavings !== null && i.essentialMonthly !== null && i.essentialMonthly > 0) {
+    const months = i.liquidSavings / i.essentialMonthly;
+    parts.push(clamp((months / 6) * 100)); // 6+ months of essentials → 100
+  }
+  if (i.debtBandScore !== null) parts.push(i.debtBandScore);
+  if (i.grossAnnualIncome !== null && i.essentialMonthly !== null && i.discretionaryMonthly !== null && i.grossAnnualIncome > 0) {
+    const monthlyIncome = i.grossAnnualIncome / 12;
+    const savingsRate = (monthlyIncome - i.essentialMonthly - i.discretionaryMonthly) / monthlyIncome;
+    parts.push(clamp((savingsRate / 0.2) * 100)); // 20%+ savings rate → 100
+  }
+  if (i.dependableScore !== null) parts.push(i.dependableScore);
+  if (!parts.length) return null;
+  return Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+}
+
+/** s09 total-debt answer id → band score; unknown / prefer-not-to-say stays unknown. */
+export function surveyDebtBandScore(answerId: string | undefined): number | null {
+  const debtScore: Record<string, number> = { s09_a: 100, s09_b: 85, s09_c: 65, s09_d: 40, s09_e: 15 };
+  return answerId ? (debtScore[answerId] ?? null) : null;
+}
+
+/** s10 dependable-income answer id → score; unknown / unsure stays unknown. */
+export function surveyDependableScore(answerId: string | undefined): number | null {
+  return answerId ? ({ s10_a: 30, s10_b: 70, s10_c: 100 }[answerId] ?? null) : null;
+}
+
+/** Total debt in dollars → the same s09 band score a survey answer maps to.
+ *  Debt of $0 counts as confirmed none (same as debtsConfirmedNone elsewhere). */
+export function debtBandScoreFromAmount(totalDebtDollars: number | null, confirmedNone: boolean): number | null {
+  if (totalDebtDollars === null) return confirmedNone ? 100 : null;
+  if (totalDebtDollars <= 0) return 100;
+  if (totalDebtDollars < 10_000) return 85;
+  if (totalDebtDollars < 50_000) return 65;
+  if (totalDebtDollars < 200_000) return 40;
+  return 15;
+}
+
 /** Financial foundations from the survey: emergency cushion, debt load, savings rate, dependable income. */
 export function scoreFoundationsPillar(answers: SurveyAnswers | null): WellnessPillar {
   const base = { id: "foundations" as const, label: "Financial foundations", weight: 0.2 };
   if (!answers || !Object.keys(answers).length) return { ...base, score: null, detail: "Complete the financial assessment survey first." };
-  const parts: number[] = [];
-
-  const savings = bandValue("s08_liquid_savings", answers["s08_liquid_savings"]);
-  const essential = bandValue("s06_essential_expenses", answers["s06_essential_expenses"]);
-  if (savings !== null && essential !== null && essential > 0) {
-    const months = savings / essential;
-    parts.push(clamp((months / 6) * 100)); // 6+ months of essentials → 100
-  }
-  const debtAnswer = answers["s09_total_debt"];
-  if (debtAnswer) {
-    const debtScore: Record<string, number> = { s09_a: 100, s09_b: 85, s09_c: 65, s09_d: 40, s09_e: 15 };
-    const v = debtScore[debtAnswer];
-    if (v !== undefined) parts.push(v);
-  }
-  const income = bandValue("s05_gross_income", answers["s05_gross_income"]);
-  const discretionary = bandValue("s07_discretionary_spending", answers["s07_discretionary_spending"]);
-  if (income !== null && essential !== null && discretionary !== null && income > 0) {
-    const monthlyIncome = income / 12;
-    const savingsRate = (monthlyIncome - essential - discretionary) / monthlyIncome;
-    parts.push(clamp((savingsRate / 0.2) * 100)); // 20%+ savings rate → 100
-  }
-  const dependable = answers["s10_dependable_income"];
-  if (dependable) {
-    const v = { s10_a: 30, s10_b: 70, s10_c: 100 }[dependable];
-    if (v !== undefined) parts.push(v);
-  }
-
-  if (!parts.length) return { ...base, score: null, detail: "Survey answers were too incomplete to score." };
-  const score = Math.round(parts.reduce((a, b) => a + b, 0) / parts.length);
+  const score = scoreFoundationsCore({
+    liquidSavings: bandValue("s08_liquid_savings", answers["s08_liquid_savings"]),
+    essentialMonthly: bandValue("s06_essential_expenses", answers["s06_essential_expenses"]),
+    debtBandScore: surveyDebtBandScore(answers["s09_total_debt"]),
+    grossAnnualIncome: bandValue("s05_gross_income", answers["s05_gross_income"]),
+    discretionaryMonthly: bandValue("s07_discretionary_spending", answers["s07_discretionary_spending"]),
+    dependableScore: surveyDependableScore(answers["s10_dependable_income"]),
+  });
+  if (score === null) return { ...base, score: null, detail: "Survey answers were too incomplete to score." };
   return { ...base, score, detail: "Based on your savings cushion, debt, savings rate, and dependable income." };
 }
 
