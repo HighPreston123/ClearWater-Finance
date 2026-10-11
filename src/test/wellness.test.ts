@@ -1,10 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
   composeWellness,
+  scoreFoundationsCore,
   scoreFoundationsPillar,
   scoreFundamentalsPillar,
   scorePortfolioPillar,
   scoreRetirementPillar,
+  surveyDebtBandScore,
+  surveyDependableScore,
 } from "@/lib/risk/wellness";
 import type { PortfolioRiskResult } from "@/lib/risk/portfolioRisk";
 import type { MonteCarloResult } from "@/lib/risk/monteCarlo";
