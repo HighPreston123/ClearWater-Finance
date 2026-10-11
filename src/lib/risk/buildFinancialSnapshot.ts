@@ -5,6 +5,17 @@ import { valuePortfolio } from "@/lib/investments/valuation";
 
 const STALE_MANUAL_DAYS = 90;
 
+/** Summary of the latest auto-fetched Alpaca daily-bar history (from the portfolio risk run). */
+export interface MarketCoverage { status: "ready" | "insufficient_data"; observations: number; window: { start: string; end: string } | null; missingSymbols: string[] }
+
+function marketItem(m: MarketCoverage | null | undefined): InputCoverageItem {
+  const base = { id: "market", category: "Historical market data" } as const;
+  if (!m) return { ...base, availability: "missing", detail: "Loads automatically from Alpaca when you have priced holdings" };
+  if (m.status !== "ready" || !m.observations) return { ...base, availability: "missing", detail: "Not enough daily price history for your holdings" };
+  const miss = m.missingSymbols.length ? `; no history for ${m.missingSymbols.join(", ")}` : "";
+  return { ...base, availability: m.missingSymbols.length ? "stale" : "available", detail: `${m.observations} trading days${m.window ? ` (${m.window.start} → ${m.window.end})` : ""}${miss}` };
+}
+
 export const EMPTY_MANUAL_INPUTS: ManualFinancialInputs = {
   emergencyFundCents: null,
   emergencyFundTargetCents: null,
@@ -26,6 +37,7 @@ export function computeCoverage(p: {
   portfolioPartial: boolean;
   portfolioStale: number;
   now?: Date | undefined;
+  market?: MarketCoverage | null | undefined;
 }): InputCoverageItem[] {
   const now = p.now ?? new Date();
   const manualStale = p.manual.updatedAt ? now.getTime() - Date.parse(p.manual.updatedAt) > STALE_MANUAL_DAYS * 86_400_000 : false;
@@ -41,7 +53,7 @@ export function computeCoverage(p: {
     { id: "goals", category: "Savings goals and upcoming large expenses", availability: man(p.manual.goals.length > 0 || p.manual.obligations.length > 0), detail: `${p.manual.goals.length} goal(s), ${p.manual.obligations.length} obligation(s)` },
     { id: "holdings", category: "Investment accounts and holdings", availability: p.holdings.length ? (p.portfolioStale ? "stale" : "available") : "missing", detail: `${p.holdings.length} holding(s)${p.portfolioPartial ? ", some unvalued" : ""}${p.portfolioStale ? `, ${p.portfolioStale} stale` : ""}` },
     { id: "concentration", category: "Portfolio concentration and asset exposure", availability: p.holdings.length ? "available" : "missing", detail: "Derived from holdings; underlying fund exposure is partially classified" },
-    { id: "market", category: "Historical market data", availability: "missing", detail: "Not connected" },
+    marketItem(p.market),
     { id: "horizon", category: "Time horizon and risk comfort", availability: man(p.manual.timeHorizonYears !== null || p.manual.riskComfort !== "unknown"), detail: `Horizon: ${p.manual.timeHorizonYears ?? "Unknown"}; comfort: ${p.manual.riskComfort}` },
   ];
 }
@@ -54,6 +66,7 @@ export function buildFinancialSnapshot(p: {
   accounts: InvestmentAccount[];
   holdings: Holding[];
   now?: Date | undefined;
+  market?: MarketCoverage | null | undefined;
 }): FinancialSnapshot {
   const pv = valuePortfolio(p.accounts, p.holdings, p.now);
   return {
@@ -63,6 +76,6 @@ export function buildFinancialSnapshot(p: {
     manual: p.manual,
     investments: { accounts: p.accounts, holdings: p.holdings, totalValueMicros: pv.totalMicros.toString(), partial: pv.partial },
     marketHistory: null,
-    coverage: computeCoverage({ months: p.months, recurring: p.recurring, manual: p.manual, holdings: p.holdings, portfolioPartial: pv.partial, portfolioStale: pv.staleCount, now: p.now }),
+    coverage: computeCoverage({ months: p.months, recurring: p.recurring, manual: p.manual, holdings: p.holdings, portfolioPartial: pv.partial, portfolioStale: pv.staleCount, now: p.now, market: p.market }),
   };
 }

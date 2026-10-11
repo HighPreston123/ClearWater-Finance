@@ -7,6 +7,7 @@ import { completeMonthsInRange, datasetCompleteMonths, monthKey, prevMonth } fro
 import { primaryRecommendation } from "@/lib/finance/recommendations";
 import { valuePortfolio } from "@/lib/investments/valuation";
 import { buildFinancialSnapshot } from "@/lib/risk/buildFinancialSnapshot";
+import { useRiskResults } from "@/lib/risk/resultsStore";
 import { activeRiskEngine } from "@/lib/risk/riskEngine";
 import { composeWellnessScore } from "@/lib/risk/composeWellnessScore";
 import { profileImprovementActions } from "@/lib/finance/profileImprovementActions";
@@ -77,6 +78,7 @@ export function usePortfolio() {
 /** All derived numbers come from the same transaction list and range, so totals and charts agree. */
 export function useDerived() {
   const s = useFinanceStore();
+  const market = useRiskResults().portfolioRisk;
   return useMemo(() => {
     const now = new Date();
     const all = s.transactions;
@@ -89,7 +91,7 @@ export function useDerived() {
       recurring, manual: s.manual,
     });
     const portfolio = portfolioFor(s.accounts, s.holdings);
-    const snapshot = buildFinancialSnapshot({ selectedRange: r.summary, months: allMonths, recurring, manual: s.manual, accounts: s.accounts, holdings: s.holdings, now });
+    const snapshot = buildFinancialSnapshot({ selectedRange: r.summary, months: allMonths, recurring, manual: s.manual, accounts: s.accounts, holdings: s.holdings, now, market });
     const risk = activeRiskEngine.assess(snapshot);
     const wellness = composeWellnessScore(r.score, risk);
     const actions = profileImprovementActions(all, r.score, risk);
@@ -98,5 +100,5 @@ export function useDerived() {
       activeRecurring, recurringMonthly,
       score: r.score, recommendation, portfolio, snapshot, risk, wellness, actions, label: r.label, completeInRange: r.completeInRange,
     };
-  }, [s.transactions, s.range, s.recurringOverrides, s.manual, s.accounts, s.holdings]);
+  }, [s.transactions, s.range, s.recurringOverrides, s.manual, s.accounts, s.holdings, market]);
 }
