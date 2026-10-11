@@ -1,7 +1,10 @@
 import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useRiskResults } from "@/lib/risk/resultsStore";
 import { composeWellness } from "@/lib/risk/wellness";
+import { MIN_MEANINGFUL } from "@/lib/risk/profileResilience";
 import { GlassCard, Note } from "@/components/common/Glass";
+import { comparisonQuery } from "./ResilienceComparisonCard";
 
 function tone(score: number | null): string {
   if (score === null) return "text-muted-foreground";
@@ -13,6 +16,11 @@ function tone(score: number | null): string {
 export function WellnessScoreCard() {
   const results = useRiskResults();
   const wellness = useMemo(() => composeWellness(results), [results]);
+  const comparison = useQuery(comparisonQuery);
+  const foundations = useMemo(() => wellness.pillars.find((p) => p.id === "foundations") ?? null, [wellness]);
+  const cmp = comparison.data?.status === "ok" ? comparison.data.data : null;
+  const groupAvg = cmp?.foundations?.average ?? null;
+  const groupScored = cmp?.foundations?.scored ?? 0;
 
   return (
     <GlassCard className="space-y-4 p-6">
@@ -30,6 +38,33 @@ export function WellnessScoreCard() {
         <div className="flex items-end gap-3">
           <p className={`text-5xl font-bold tabular-nums ${tone(wellness.overall)}`}>{wellness.overall}</p>
           <p className="pb-1 text-sm text-muted-foreground">/ 100</p>
+        </div>
+      )}
+
+      {groupAvg !== null && groupScored >= MIN_MEANINGFUL && (
+        <div className="space-y-2 rounded-xl border p-4">
+          <p className="text-sm font-medium">How you compare</p>
+          {wellness.overall !== null ? (
+            <p className="text-sm text-muted-foreground">
+              Your wellness score is <span className={`font-semibold tabular-nums ${tone(wellness.overall)}`}>{wellness.overall}</span> — the 100 sample
+              profiles average <span className="font-semibold text-foreground tabular-nums">{Math.round(groupAvg)}</span>.{" "}
+              {wellness.overall >= groupAvg ? "You are above" : "You are below"} the group average.
+            </p>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              The 100 sample profiles average a wellness score of <span className="font-semibold text-foreground tabular-nums">{Math.round(groupAvg)}</span>.
+            </p>
+          )}
+          {foundations?.score != null && (
+            <p className="text-sm text-muted-foreground">
+              On financial foundations — the one pillar the sample group has data for — you score{" "}
+              <span className={`font-semibold tabular-nums ${tone(foundations.score)}`}>{foundations.score}</span> vs their average{" "}
+              <span className="tabular-nums">{Math.round(groupAvg)}</span>.
+            </p>
+          )}
+          <Note>
+            The sample profiles are scored with the same formula, but only on financial foundations: they have no holdings, company filings, or survey answers.
+          </Note>
         </div>
       )}
 

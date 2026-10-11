@@ -119,6 +119,20 @@ describe("wellness score", () => {
     expect(unknown.score).toBeNull();
   });
 
+  it("scoreFoundationsCore gives the same result as the survey path on the same numbers", () => {
+    const answers = {
+      s05_gross_income: "s05_b", s06_essential_expenses: "s06_b", s08_liquid_savings: "s08_c",
+      s09_total_debt: "s09_c", s10_dependable_income: "s10_b",
+    };
+    const viaSurvey = scoreFoundationsPillar(answers).score;
+    const viaCore = scoreFoundationsCore({
+      liquidSavings: 12_500, essentialMonthly: 2_250, grossAnnualIncome: 37_500, discretionaryMonthly: null,
+      debtBandScore: surveyDebtBandScore("s09_c"), dependableScore: surveyDependableScore("s10_b"),
+    });
+    expect(viaSurvey).not.toBeNull();
+    expect(viaCore).toBe(viaSurvey);
+  });
+
   it("renormalizes weights across available pillars", () => {
     const w = composeWellness({
       portfolioRisk: null,
