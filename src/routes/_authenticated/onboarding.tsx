@@ -75,13 +75,13 @@ function Onboarding() {
 
   const finish = async () => {
     const gaps = missingQuestions(answers);
-    if (gaps.length) { setMissing(gaps); setIndex(gaps[0]!); return; }
+    if (gaps.length) { setMissing(gaps); return; }
     setSubmitting(true);
     setError(null);
     try {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const r = await complete({ data: { answers } });
-      if (r.status === "missing") { setMissing(r.missing); setIndex(r.missing[0]!); return; }
+      if (r.status === "missing") { setMissing(r.missing); return; }
       await supabase.auth.updateUser({ data: { onboarding_pending: false } });
       if (uid) localStorage.removeItem(LOCAL_KEY(uid));
       if (uid) markOnboardingCompleted(uid);
@@ -93,7 +93,6 @@ function Onboarding() {
     }
   };
 
-  const q = QUIZ_QUESTIONS[index]!;
   const answeredCount = TOTAL - missingQuestions(answers).length;
 
   return (
