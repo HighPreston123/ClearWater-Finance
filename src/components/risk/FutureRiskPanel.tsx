@@ -1,3 +1,4 @@
+import type React from "react";
 import { Link } from "@tanstack/react-router";
 import { ShieldQuestion } from "lucide-react";
 import type { RiskAssessment } from "@/types/risk";
