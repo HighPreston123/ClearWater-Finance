@@ -34,7 +34,6 @@ function Onboarding() {
   const [firstName, setFirstName] = useState("there");
   const [uid, setUid] = useState<string | null>(null);
   const [answers, setAnswers] = useState<QuizAnswers>({});
-  const [index, setIndex] = useState(0);
   const [missing, setMissing] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
