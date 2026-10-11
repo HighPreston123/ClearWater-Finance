@@ -6,7 +6,7 @@ import { computePortfolioRisk, type PortfolioRiskResult, type PriceSeries } from
 const sym = z.string().trim().toUpperCase().regex(/^[A-Z][A-Z0-9.]{0,9}$/);
 export const BENCHMARK = "SPY";
 
-/** Pulls Alpaca daily bars (cached in TigerData) for the given positions + SPY, then runs the pure engine. */
+/** Pulls Alpaca daily bars (cached in the app database) for the given positions + SPY, then runs the pure engine. */
 export const getPortfolioRisk = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -14,7 +14,6 @@ export const getPortfolioRisk = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ status: "ok"; result: PortfolioRiskResult } | { status: "error"; message: string }> => {
     const { assertMfa } = await import("./mfa.server");
     await assertMfa(context);
-    const { withOwner } = await import("./tiger.server");
     const { syncDailyBars } = await import("./marketdata.server");
     const symbols = [...new Set(data.positions.map((p) => p.symbol))];
     const series: PriceSeries[] = [];
@@ -22,7 +21,7 @@ export const getPortfolioRisk = createServerFn({ method: "POST" })
     let firstError: string | null = null;
     for (const s of [...symbols, BENCHMARK]) {
       try {
-        const r = await withOwner(context.userId, (tx) => syncDailyBars(tx, s, data.days));
+        const r = await syncDailyBars(context.supabase, s, data.days);
         const ps = { symbol: s, points: r.bars.map((b) => ({ date: b.t, close: b.c })) };
         if (s === BENCHMARK && !symbols.includes(s)) benchmark = ps; else series.push(ps);
         if (s === BENCHMARK && symbols.includes(s)) benchmark = ps;
