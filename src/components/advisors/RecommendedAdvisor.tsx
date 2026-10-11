@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Users } from "lucide-react";
 import { GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
-import { Badge } from "@/components/ui/badge";
 import { useAdvisorRecommendation } from "./useAdvisorRecommendation";
 import type { AdvisorRecord } from "@/lib/reference.server";
 import type { PersonalMatch } from "@/lib/advisors/personalMatch";
@@ -71,4 +70,3 @@ export function RecommendedAdvisor({ compact, onView }: { compact?: boolean; onV
   );
 }
 
-export { Badge };
