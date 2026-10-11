@@ -4,7 +4,15 @@
 
 ClearWater is a hackathon financial-planning prototype that brings income, spending, savings, investments, and financial risk into one dashboard. It helps users understand their current position, explore future scenarios, and find the kind of financial advisor that fits their needs.
 
-**[Open the demo](https://advisor-voice-plan.lovable.app)**
+## Live Demo
+🔗 https://advisor-voice-plan.lovable.app
+
+**Demo login**
+- Email: HackNC2026@gmail.com
+- Password: hacknc2026
+
+The demo account is preloaded with sample transactions, investments, and savings/loan data.
+Please explore only. Don't delete or edit data, since everyone shares this account.
 
 ## Inspiration
 
