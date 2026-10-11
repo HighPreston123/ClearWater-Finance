@@ -1,5 +1,4 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { ChevronDown } from "lucide-react";
 import { useDerived } from "@/store/useDerived";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { PageHeader, GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
@@ -14,7 +13,6 @@ import { TigerAnalyticsPanel } from "@/components/analytics/TigerAnalyticsPanel"
 import { AIInsightsPanel } from "@/components/integrations/AIInsightsPanel";
 import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
 import { RecommendedAdvisor } from "@/components/advisors/RecommendedAdvisor";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCents, formatMicros, formatPct } from "@/lib/format";
 import { buildInsightPayload } from "@/lib/insights/payload";
 import { buildAudioSummaryText } from "@/lib/finance/audioSummaryText";
