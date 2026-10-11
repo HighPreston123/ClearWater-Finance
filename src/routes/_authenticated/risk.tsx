@@ -14,9 +14,9 @@ export const Route = createFileRoute("/_authenticated/risk")({
   head: () => ({
     meta: [
       { title: "Future risk — Clearwater" },
-      { name: "description", content: "Inputs for the upcoming future-risk analysis. No assessment is calculated yet." },
+      { name: "description", content: "Your Future Resilience Score: liquidity, cash flow, debt, goals and portfolio resilience." },
       { property: "og:title", content: "Future risk — Clearwater" },
-      { property: "og:description", content: "Inputs for the upcoming future-risk analysis. No assessment is calculated yet." },
+      { property: "og:description", content: "Your Future Resilience Score: liquidity, cash flow, debt, goals and portfolio resilience." },
     ],
   }),
   component: Risk,
