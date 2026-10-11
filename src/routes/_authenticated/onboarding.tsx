@@ -162,7 +162,6 @@ function Onboarding() {
 
             <ol className="mt-8 space-y-10">
               {QUIZ_QUESTIONS.map((q, i) => {
-                const selected = answers[q.id] === undefined;
                 return (
                   <li key={q.id} id={`quiz-question-${i}`} className="animate-aero-rise">
                     <h2 id={`quiz-q-${i}`} className="font-display text-xl font-extrabold leading-snug text-foreground">
