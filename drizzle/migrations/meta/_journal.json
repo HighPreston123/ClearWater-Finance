@@ -1,34 +1,5 @@
 {
   "version": "7",
   "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1791695601404,
-      "tag": "0000_clearwater_fin_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1791695648239,
-      "tag": "0001_fin_sequences_after_import",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1791697098730,
-      "tag": "0002_mfa_restrictive_policies",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1791701918906,
-      "tag": "0003_user_need_categories",
-      "breakpoints": true
-    }
-  ]
+  "entries": []
 }
