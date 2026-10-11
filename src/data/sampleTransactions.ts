@@ -1,0 +1,122 @@
+import type { Transaction, TransactionType } from "@/types/finance";
+import { categorizeByRules } from "@/lib/finance/categorization";
+
+export const CHECKING = "acct-checking";
+export const SAVINGS = "acct-savings";
+export const ROTH = "inv-roth-1"; // matches samplePortfolio
+
+type Raw = [date: string, merchant: string, dollars: number, type: TransactionType, description: string, linked?: string];
+const I: TransactionType = "income", E: TransactionType = "expense", T: TransactionType = "transfer";
+
+/**
+ * Three complete months (Jul–Sep 2026) plus a partial October.
+ * Demonstrates: recurring merchants, a variable utility bill, weekly transit,
+ * one-time purchases, a negative month (Aug) and an improving month (Sep).
+ */
+const RAW: Raw[] = [
+  // ---- July 2026
+  ["2026-07-01", "Acme Corp Payroll", 2100, I, "Semi-monthly paycheck"],
+  ["2026-07-01", "Parkview Apartments", 1650, E, "July rent"],
+  ["2026-07-02", "Trader Joe's", 86.2, E, "Groceries"],
+  ["2026-07-03", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-07-05", "Netflix", 15.49, E, "Streaming plan"],
+  ["2026-07-06", "Chipotle", 14.25, E, "Lunch"],
+  ["2026-07-08", "City Power & Light", 92.4, E, "Electric bill"],
+  ["2026-07-09", "Safeway", 112.45, E, "Groceries"],
+  ["2026-07-10", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-07-10", "Comcast Internet", 65, E, "Home internet"],
+  ["2026-07-12", "Spotify", 11.99, E, "Music plan"],
+  ["2026-07-13", "Sakura Sushi", 48.6, E, "Dinner"],
+  ["2026-07-14", "Shell Gas", 45.2, E, "Fuel"],
+  ["2026-07-15", "Acme Corp Payroll", 2100, I, "Semi-monthly paycheck"],
+  ["2026-07-16", "Transfer to High-Yield Savings", 300, T, "Monthly savings transfer", SAVINGS],
+  ["2026-07-16", "Roth IRA Contribution", 200, T, "Investment-account contribution", ROTH],
+  ["2026-07-17", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-07-18", "Whole Foods", 97.3, E, "Groceries"],
+  ["2026-07-19", "Target", 64.99, E, "Household items"],
+  ["2026-07-20", "FitLife Gym", 40, E, "Membership"],
+  ["2026-07-21", "Blue Bottle Coffee", 6.75, E, "Coffee"],
+  ["2026-07-22", "Verizon Wireless", 55, E, "Phone plan"],
+  ["2026-07-24", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-07-24", "AMC Theatres", 32, E, "Movie tickets"],
+  ["2026-07-26", "Luigi's Trattoria", 62.1, E, "Dinner"],
+  ["2026-07-27", "Trader Joe's", 104.8, E, "Groceries"],
+  ["2026-07-29", "CVS Pharmacy", 18.4, E, "Prescription"],
+  ["2026-07-31", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  // ---- August 2026 (negative month: laptop + car repair)
+  ["2026-08-01", "Acme Corp Payroll", 2100, I, "Semi-monthly paycheck"],
+  ["2026-08-01", "Parkview Apartments", 1650, E, "August rent"],
+  ["2026-08-02", "Taqueria El Sol", 22.4, E, "Lunch"],
+  ["2026-08-03", "Safeway", 121.6, E, "Groceries"],
+  ["2026-08-05", "Netflix", 15.49, E, "Streaming plan"],
+  ["2026-08-06", "Shell Gas", 48.75, E, "Fuel"],
+  ["2026-08-07", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-08-08", "City Power & Light", 138.75, E, "Electric bill (heat wave)"],
+  ["2026-08-09", "Sakura Sushi", 54.3, E, "Dinner"],
+  ["2026-08-10", "Comcast Internet", 65, E, "Home internet"],
+  ["2026-08-11", "Trader Joe's", 93.15, E, "Groceries"],
+  ["2026-08-12", "Spotify", 11.99, E, "Music plan"],
+  ["2026-08-12", "Best Buy", 1449.99, E, "New laptop (one-time)"],
+  ["2026-08-14", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-08-15", "Acme Corp Payroll", 2100, I, "Semi-monthly paycheck"],
+  ["2026-08-16", "Roth IRA Contribution", 200, T, "Investment-account contribution", ROTH],
+  ["2026-08-16", "Luigi's Trattoria", 71.8, E, "Dinner"],
+  ["2026-08-18", "Midas Auto Repair", 890, E, "Brake replacement (one-time)"],
+  ["2026-08-19", "Whole Foods", 118.9, E, "Groceries"],
+  ["2026-08-20", "FitLife Gym", 40, E, "Membership"],
+  ["2026-08-21", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-08-22", "Verizon Wireless", 55, E, "Phone plan"],
+  ["2026-08-23", "Shake Shack", 28.15, E, "Dinner"],
+  ["2026-08-24", "Live Nation", 145, E, "Concert tickets"],
+  ["2026-08-26", "Urgent Care Copay", 75, E, "Clinic visit"],
+  ["2026-08-27", "Amazon", 86.4, E, "Home office supplies"],
+  ["2026-08-28", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-08-29", "Blue Bottle Coffee", 7.25, E, "Coffee"],
+  ["2026-08-30", "Safeway", 109.25, E, "Groceries"],
+  // ---- September 2026 (improving month)
+  ["2026-09-01", "Acme Corp Payroll", 2100, I, "Semi-monthly paycheck"],
+  ["2026-09-01", "Parkview Apartments", 1650, E, "September rent"],
+  ["2026-09-02", "Trader Joe's", 91.4, E, "Groceries"],
+  ["2026-09-04", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-09-05", "Netflix", 15.49, E, "Streaming plan"],
+  ["2026-09-07", "Chipotle", 13.9, E, "Lunch"],
+  ["2026-09-08", "City Power & Light", 104.1, E, "Electric bill"],
+  ["2026-09-10", "Safeway", 106.85, E, "Groceries"],
+  ["2026-09-10", "Comcast Internet", 65, E, "Home internet"],
+  ["2026-09-11", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-09-12", "Spotify", 11.99, E, "Music plan"],
+  ["2026-09-13", "Shell Gas", 44.1, E, "Fuel"],
+  ["2026-09-14", "Sakura Sushi", 46.2, E, "Dinner"],
+  ["2026-09-15", "Acme Corp Payroll", 2100, I, "Semi-monthly paycheck"],
+  ["2026-09-16", "Transfer to High-Yield Savings", 400, T, "Monthly savings transfer", SAVINGS],
+  ["2026-09-16", "Roth IRA Contribution", 200, T, "Investment-account contribution", ROTH],
+  ["2026-09-17", "Whole Foods", 99.2, E, "Groceries"],
+  ["2026-09-18", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-09-19", "Dental Associates", 120, E, "Cleaning copay"],
+  ["2026-09-20", "FitLife Gym", 40, E, "Membership"],
+  ["2026-09-20", "Brightline Design Freelance", 350, I, "Freelance project"],
+  ["2026-09-21", "Target", 52.3, E, "Household items"],
+  ["2026-09-22", "Verizon Wireless", 55, E, "Phone plan"],
+  ["2026-09-24", "AMC Theatres", 28, E, "Movie tickets"],
+  ["2026-09-25", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-09-26", "Trader Joe's", 88.65, E, "Groceries"],
+  ["2026-09-27", "Blue Bottle Coffee", 6.5, E, "Coffee"],
+  // ---- October 2026 (partial month)
+  ["2026-10-01", "Acme Corp Payroll", 2100, I, "Semi-monthly paycheck"],
+  ["2026-10-01", "Parkview Apartments", 1650, E, "October rent"],
+  ["2026-10-02", "Metro Transit Weekly Pass", 25, E, "Transit pass"],
+  ["2026-10-03", "Trader Joe's", 79.3, E, "Groceries"],
+];
+
+export const SAMPLE_TRANSACTIONS: Transaction[] = RAW.map(([date, merchant, dollars, type, description, linked], i) => ({
+  id: `txn-${String(i + 1).padStart(3, "0")}`,
+  date,
+  merchant,
+  amount: Math.round(dollars * 100),
+  type,
+  category: categorizeByRules(merchant, description, type),
+  categorySource: "rule",
+  description,
+  accountId: CHECKING,
+  ...(linked ? { linkedAccountId: linked } : {}),
+}));

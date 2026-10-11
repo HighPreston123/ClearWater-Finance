@@ -1,0 +1,26 @@
+import { createServerFn } from "@tanstack/react-start";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import type { ServiceResult } from "@/services/types";
+import type { AdvisorRecord, ReferenceDiagnostics } from "@/lib/reference.server";
+
+export const listAdvisorRecords = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ServiceResult<AdvisorRecord[]>> => {
+    const { readAdvisors } = await import("@/lib/reference.server");
+    try {
+      return { status: "ok", data: await readAdvisors(context.userId), source: "tigerdata", fetchedAt: new Date().toISOString() } as ServiceResult<AdvisorRecord[]>;
+    } catch {
+      return { status: "error", message: "Advisor directory is unavailable right now." };
+    }
+  });
+
+export const getReferenceDiagnostics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<ServiceResult<ReferenceDiagnostics>> => {
+    const { readDiagnostics } = await import("@/lib/reference.server");
+    try {
+      return { status: "ok", data: await readDiagnostics(context.userId), source: "tigerdata", fetchedAt: new Date().toISOString() } as ServiceResult<ReferenceDiagnostics>;
+    } catch {
+      return { status: "error", message: "Diagnostics are unavailable right now." };
+    }
+  });
