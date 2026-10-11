@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuthWithMfa } from "@/lib/mfa-middleware";
 import {
   SURVEY_VERSION,
   missingSurveyQuestions,
@@ -19,7 +19,7 @@ export interface RiskSurveyState {
 const answersInput = (input: { answers: unknown }) => ({ answers: sanitizeSurveyAnswers(input?.answers) });
 
 export const getRiskSurvey = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .handler(async ({ context }): Promise<RiskSurveyState> => {
     const { check } = await import("@/lib/db.server");
     const r = check(await context.supabase.from("fin_risk_survey").select("answers, target_profile, updated_at")
@@ -34,7 +34,7 @@ export const getRiskSurvey = createServerFn({ method: "GET" })
 
 /** Saves the extended survey (editable at any time) and stores the derived target profile. */
 export const saveRiskSurvey = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .inputValidator(answersInput)
   .handler(async ({ data, context }): Promise<{ ok: true; missing: number[]; targetProfile: TargetProfile }> => {
     const targetProfile = deriveTargetProfile(data.answers);

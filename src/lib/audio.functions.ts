@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuthWithMfa } from "@/lib/mfa-middleware";
 import type { ServiceResult } from "@/services/types";
 
 // George — a supported ElevenLabs premade voice. Turbo v2.5 = fast, high quality.
@@ -15,7 +15,7 @@ function toBase64(buf: ArrayBuffer): string {
 
 /** Converts the Overview's written summary to speech. The API key never leaves the server. */
 export const generateAudioSummary = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .inputValidator((input: { text: string }) => {
     const text = typeof input?.text === "string" ? input.text.trim() : "";
     if (!text || text.length > 2000) throw new Error("Invalid summary text");

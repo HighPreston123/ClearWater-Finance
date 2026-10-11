@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuthWithMfa } from "@/lib/mfa-middleware";
 import type { ServiceResult } from "@/services/types";
 
 /**
@@ -8,14 +8,14 @@ import type { ServiceResult } from "@/services/types";
  * plus source/freshness metadata. Errors are returned, never thrown into the UI.
  */
 export const getNessieStatus = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .handler(async (): Promise<{ configured: boolean; reachable: boolean }> => {
     const { probeNessie } = await import("@/services/transactions/nessie.server");
     return probeNessie();
   });
 
 export const getNessieOverview = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .handler(async (): Promise<ServiceResult<Awaited<ReturnType<typeof import("@/services/transactions/nessie.server").fetchNessieOverview>>>> => {
     const { fetchNessieOverview, NessieNotConfiguredError } = await import("@/services/transactions/nessie.server");
     try {
@@ -30,7 +30,7 @@ export const getNessieOverview = createServerFn({ method: "GET" })
   });
 
 export const getNessieAdvisorRecords = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .handler(async (): Promise<ServiceResult<Awaited<ReturnType<typeof import("@/services/transactions/nessie.server").fetchNessieAdvisorRecords>>>> => {
     const { fetchNessieAdvisorRecords, NessieNotConfiguredError } = await import("@/services/transactions/nessie.server");
     try {

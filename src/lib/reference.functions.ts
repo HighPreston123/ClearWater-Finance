@@ -1,10 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireAuthWithMfa } from "@/lib/mfa-middleware";
 import type { ServiceResult } from "@/services/types";
 import type { AdvisorRecord, ReferenceDiagnostics } from "@/lib/reference.server";
 
 export const listAdvisorRecords = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .handler(async ({ context }): Promise<ServiceResult<AdvisorRecord[]>> => {
     const { readAdvisors } = await import("@/lib/reference.server");
     try {
@@ -15,7 +15,7 @@ export const listAdvisorRecords = createServerFn({ method: "GET" })
   });
 
 export const getReferenceDiagnostics = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
+  .middleware([requireAuthWithMfa])
   .handler(async ({ context }): Promise<ServiceResult<ReferenceDiagnostics>> => {
     const { readDiagnostics } = await import("@/lib/reference.server");
     try {
