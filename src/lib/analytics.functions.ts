@@ -12,9 +12,9 @@ const guard = async (context: unknown) => (await import("./mfa.server")).assertM
 export const getAnalytics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<AnalyticsResult> => {
-    await guard(context);
+    const { withMfaRead } = await import("./mfa.server");
     const { getAnalytics: run } = await import("./analytics.server");
-    return JSON.parse(JSON.stringify(await run(context.userId)));
+    return JSON.parse(JSON.stringify(await withMfaRead(context, () => run(context.userId))));
   });
 
 export const refreshAnalysis = createServerFn({ method: "POST" })
