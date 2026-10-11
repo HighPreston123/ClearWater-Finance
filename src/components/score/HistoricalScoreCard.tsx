@@ -13,11 +13,11 @@ function Scale({ score }: { score: number }) {
       <div className="relative flex h-3 overflow-hidden rounded-full">
         {SCORE_LABELS.map((l, i) => {
           const prev = i ? SCORE_LABELS[i - 1]!.max : 0;
-          return <div key={l.label} style={{ width: `${((l.max - prev) / 1000) * 100}%`, background: `var(--score-${l.tone})` }} />;
+          return <div key={l.label} style={{ width: `${((l.max - prev) / 100) * 100}%`, background: `var(--score-${l.tone})` }} />;
         })}
       </div>
       <div className="relative h-3">
-        <div className="absolute -top-1 h-4 w-1 -translate-x-1/2 rounded-full bg-foreground" style={{ left: `${score / 10}%` }} />
+        <div className="absolute -top-1 h-4 w-1 -translate-x-1/2 rounded-full bg-foreground" style={{ left: `${score}%` }} />
       </div>
     </div>
   );
@@ -27,7 +27,7 @@ export function HistoricalScoreCard({ score, compact = false }: { score: ScoreRe
   const [open, setOpen] = useState(!compact);
   return (
     <GlassCard>
-      <CardTitle info={<InfoTip title="Historical cash-flow score" means="A 0–1,000 educational summary of how your recorded income compared with spending." calc="Up to 700 points for the latest complete month's surplus rate, plus up to 300 for how many of the two prior complete months had nonnegative cash flow." excludes="Future risk, investment risk, debt, savings balances, and the number of subscriptions." />}>
+      <CardTitle info={<InfoTip title="Historical cash-flow score" means="A 0–100 educational summary of how your recorded income compared with spending." calc="Up to 70 points for the latest complete month's surplus rate, plus up to 30 for how many of the two prior complete months had nonnegative cash flow." excludes="Future risk, investment risk, debt, savings balances, and the number of subscriptions." />}>
         Historical cash-flow score
       </CardTitle>
       {score.status !== "ok" ? (
@@ -36,7 +36,7 @@ export function HistoricalScoreCard({ score, compact = false }: { score: ScoreRe
         <>
           <div className="flex flex-wrap items-end gap-3">
             <span className="font-display text-5xl font-extrabold tabular-nums text-foreground">{score.score}</span>
-            <span className="pb-1 text-muted-foreground">/ 1,000</span>
+            <span className="pb-1 text-muted-foreground">/ 100</span>
             <StatusBadge tone="info">{score.label}</StatusBadge>
             {score.limitedHistory && <StatusBadge tone="pending">Limited history</StatusBadge>}
           </div>
@@ -58,7 +58,7 @@ export function HistoricalScoreCard({ score, compact = false }: { score: ScoreRe
                     )}
                   </div>
                   {f.normalized && (
-                    <p className="mt-1 text-sm">Normalized to 1,000: <b>{f.normalized.earned}</b> earned · {f.normalized.deducted} deducted (raw {f.earned}/{f.available}).</p>
+                    <p className="mt-1 text-sm">Normalized to 100: <b>{f.normalized.earned}</b> earned · {f.normalized.deducted} deducted (raw {f.earned}/{f.available}).</p>
                   )}
                   <ul className="mt-2 grid gap-x-4 text-sm sm:grid-cols-2">
                     {f.supporting.map((s) => <li key={s.label} className="flex justify-between gap-2"><span className="text-muted-foreground">{s.label}</span><span className="tabular-nums font-semibold">{s.value}</span></li>)}
@@ -69,8 +69,8 @@ export function HistoricalScoreCard({ score, compact = false }: { score: ScoreRe
               ))}
               <p className="text-sm font-semibold tabular-nums">
                 {score.normalized
-                  ? `Total: ${score.factors[0]!.normalized!.earned} (raw ${score.rawScore} of ${score.rawAvailable}, normalized to 1,000)`
-                  : `Total: ${score.factors.map((f) => f.earned).join(" + ")} = ${score.score} of 1,000`}
+                  ? `Total: ${score.factors[0]!.normalized!.earned} (raw ${score.rawScore} of ${score.rawAvailable}, normalized to 100)`
+                  : `Total: ${score.factors.map((f) => f.earned).join(" + ")} = ${score.score} of 100`}
               </p>
               <Note>Historical stability improves through future months of consistent cash flow; current spending changes cannot rewrite prior months. Thresholds are product assumptions, not validated financial standards.</Note>
             </CollapsibleContent>

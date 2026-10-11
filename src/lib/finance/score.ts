@@ -5,23 +5,23 @@ import { formatCents, formatPct, monthLabel } from "@/lib/format";
 
 /** Demo rubric. These thresholds are product assumptions, not validated financial standards. */
 export const FACTOR_A_TIERS = [
-  { min: 20, points: 700, label: "20% or higher" },
-  { min: 10, points: 560, label: "10% to below 20%" },
-  { min: 5, points: 420, label: "5% to below 10%" },
-  { min: 0, points: 280, label: "0% to below 5%" },
+  { min: 20, points: 70, label: "20% or higher" },
+  { min: 10, points: 56, label: "10% to below 20%" },
+  { min: 5, points: 42, label: "5% to below 10%" },
+  { min: 0, points: 28, label: "0% to below 5%" },
   { min: -Infinity, points: 0, label: "Below 0%" },
 ];
-export const FACTOR_A_MAX = 700;
-export const FACTOR_B_MAX = 300;
+export const FACTOR_A_MAX = 70;
+export const FACTOR_B_MAX = 30;
 
 export const SCORE_LABELS = [
-  { max: 100, label: "Needs attention", tone: 1 },
-  { max: 250, label: "Getting started", tone: 2 },
-  { max: 450, label: "Building stability", tone: 3 },
-  { max: 650, label: "Making progress", tone: 4 },
-  { max: 750, label: "On track", tone: 5 },
-  { max: 900, label: "Strong", tone: 6 },
-  { max: 1000, label: "Very strong", tone: 7 },
+  { max: 10, label: "Needs attention", tone: 1 },
+  { max: 25, label: "Getting started", tone: 2 },
+  { max: 45, label: "Building stability", tone: 3 },
+  { max: 65, label: "Making progress", tone: 4 },
+  { max: 75, label: "On track", tone: 5 },
+  { max: 90, label: "Strong", tone: 6 },
+  { max: 100, label: "Very strong", tone: 7 },
 ];
 export const labelForScore = (s: number) => SCORE_LABELS.find((l) => s <= l.max)!;
 
@@ -101,7 +101,7 @@ export function computeHistoricalScore(all: Transaction[], range: DateRange): Sc
       deducted: 0,
       unavailable: true,
       supporting: [{ label: "Eligible prior months", value: "None" }],
-      threshold: "No complete prior months with recorded income. Factor unavailable; margin normalized to 1,000.",
+      threshold: "No complete prior months with recorded income. Factor unavailable; margin normalized to 100.",
       improve: "This factor becomes available after more complete months of recorded income.",
     };
   } else {
@@ -127,8 +127,8 @@ export function computeHistoricalScore(all: Transaction[], range: DateRange): Sc
   const rawAvailable = FACTOR_A_MAX + (b.unavailable ? 0 : FACTOR_B_MAX);
   let score = rawScore;
   if (b.unavailable) {
-    score = Math.round((a.earned * 1000) / FACTOR_A_MAX);
-    a.normalized = { available: 1000, earned: score, deducted: 1000 - score };
+    score = Math.round((a.earned * 100) / FACTOR_A_MAX);
+    a.normalized = { available: 100, earned: score, deducted: 100 - score };
   }
   const l = labelForScore(score);
   return { status: "ok", month, score, rawScore, rawAvailable, normalized: b.unavailable, limitedHistory: b.unavailable, label: l.label, tone: l.tone, factors: [a, b] };
