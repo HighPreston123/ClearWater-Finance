@@ -92,7 +92,7 @@ export function RetirementSimulationCard() {
           paths: 10000,
         },
       });
-      if (r.status === "ok") { setRes(r.result); publishRiskResult("monteCarlo", r.result); }
+      if (r.status === "ok") { setRes(r.result); publishRiskResult("monteCarloProvisional", num("annualContribution") === null || num("annualDependableIncome") === null); publishRiskResult("monteCarlo", r.result); }
       else setErr(`Missing inputs: ${r.missing.join(", ")}`);
     } catch { setErr("Could not run the simulation."); }
     finally { setBusy(false); }

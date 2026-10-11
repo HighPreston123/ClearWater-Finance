@@ -13,7 +13,7 @@
 - Business logic lives in pure modules under src/lib (finance, investments, risk, advisors); UI only renders their results — keeps calculations testable and swappable.
 - External services are typed stubs in src/services returning not_configured — the app must run without credentials and never fake success.
 - Persisted state goes through StorageAdapter (versioned key) — so browser storage can be replaced by a server later.
-- Risk engine and wellness composition return non-numeric "not implemented" results until the team defines the methodology — never invent scores.
+- The future-risk engine implements the team's Future Resilience Score methodology (src/lib/risk/resilience.ts, versioned; weights and curves in one config) — unknown inputs lower confidence and are never treated as zero; change formulas only from a new methodology version.
 - Per-user financial data lives in Lovable Cloud tables `public.fin_*` and is read/written only via server functions using the caller's verified client (RLS user_id = auth.uid()); TigerData (tiger/) is kept only as the rollback source — so ownership holds even if a query forgets a filter and the published Worker never needs a custom-CA TCP connection. localStorage is only the offline cache/first paint.
 - Protected data operations require aal2 when the user has a verified MFA factor — so MFA is enforced on the server, not just the UI.
 - On a failed cloud load, cloud saves stay paused and a banner shows — so local/sample data never overwrites real saved data.

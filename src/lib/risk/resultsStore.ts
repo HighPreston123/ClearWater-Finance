@@ -14,6 +14,8 @@ export interface RiskResults {
   targetProfile: TargetProfile | null;
   surveyAnswers: SurveyAnswers | null;
   monteCarlo: MonteCarloResult | null;
+  /** Simulation ran with contributions or dependable income unknown. */
+  monteCarloProvisional: boolean;
   fundamentals: FundamentalMetrics[] | null;
 }
 
@@ -22,6 +24,7 @@ let state: RiskResults = {
   targetProfile: null,
   surveyAnswers: null,
   monteCarlo: null,
+  monteCarloProvisional: false,
   fundamentals: null,
 };
 

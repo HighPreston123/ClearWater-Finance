@@ -87,11 +87,22 @@ export interface RiskAssessment {
   limitations: string[];
   scenarios: { id: string; label: string; result: unknown }[];
   potentialActions: string[];
+  /** Full v1 result (pillars, gates, range) when produced by the resilience engine. */
+  resilience?: import("@/lib/risk/resilience").ResilienceResult;
+}
+
+/** Results from the Risk page cards (portfolio risk, simulation, survey). */
+export interface RiskContext {
+  portfolioRisk?: import("@/lib/risk/portfolioRisk").PortfolioRiskResult | null;
+  monteCarlo?: import("@/lib/risk/monteCarlo").MonteCarloResult | null;
+  monteCarloProvisional?: boolean;
+  targetProfile?: import("@/lib/risk/survey").TargetProfile | null;
+  surveyAnswers?: import("@/lib/risk/survey").SurveyAnswers | null;
 }
 
 export interface RiskEngine {
   readonly methodologyVersion: string | null;
-  assess(snapshot: FinancialSnapshot): RiskAssessment;
+  assess(snapshot: FinancialSnapshot, context?: RiskContext): RiskAssessment;
 }
 
 export type WellnessComposition =

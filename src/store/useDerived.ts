@@ -78,7 +78,8 @@ export function usePortfolio() {
 /** All derived numbers come from the same transaction list and range, so totals and charts agree. */
 export function useDerived() {
   const s = useFinanceStore();
-  const market = useRiskResults().portfolioRisk;
+  const rr = useRiskResults();
+  const market = rr.portfolioRisk;
   return useMemo(() => {
     const now = new Date();
     const all = s.transactions;
@@ -92,7 +93,7 @@ export function useDerived() {
     });
     const portfolio = portfolioFor(s.accounts, s.holdings);
     const snapshot = buildFinancialSnapshot({ selectedRange: r.summary, months: allMonths, recurring, manual: s.manual, accounts: s.accounts, holdings: s.holdings, now, market });
-    const risk = activeRiskEngine.assess(snapshot);
+    const risk = activeRiskEngine.assess(snapshot, { portfolioRisk: rr.portfolioRisk, monteCarlo: rr.monteCarlo, monteCarloProvisional: rr.monteCarloProvisional, targetProfile: rr.targetProfile, surveyAnswers: rr.surveyAnswers });
     const wellness = composeWellnessScore(r.score, risk);
     const actions = profileImprovementActions(all, r.score, risk);
     return {
@@ -100,5 +101,5 @@ export function useDerived() {
       activeRecurring, recurringMonthly,
       score: r.score, recommendation, portfolio, snapshot, risk, wellness, actions, label: r.label, completeInRange: r.completeInRange,
     };
-  }, [s.transactions, s.range, s.recurringOverrides, s.manual, s.accounts, s.holdings, market]);
+  }, [s.transactions, s.range, s.recurringOverrides, s.manual, s.accounts, s.holdings, rr]);
 }
