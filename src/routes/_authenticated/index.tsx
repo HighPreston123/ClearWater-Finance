@@ -13,10 +13,8 @@ import { SpendingDonut } from "@/components/charts/SpendingDonut";
 import { TigerAnalyticsPanel } from "@/components/analytics/TigerAnalyticsPanel";
 import { AIInsightsPanel } from "@/components/integrations/AIInsightsPanel";
 import { AudioSummaryControls } from "@/components/integrations/AudioSummaryControls";
-import { AdvisorMatchCard } from "@/components/advisors/AdvisorMatchCard";
+import { RecommendedAdvisor } from "@/components/advisors/RecommendedAdvisor";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { matchAdvisor } from "@/lib/advisors/matchAdvisor";
-import { SAMPLE_ADVISORS } from "@/data/sampleAdvisors";
 import { formatCents, formatMicros, formatPct } from "@/lib/format";
 import { buildAudioSummaryText } from "@/lib/finance/audioSummaryText";
 
@@ -37,7 +35,6 @@ function Overview() {
   const { manual } = useFinanceStore();
   const navigate = useNavigate();
   const s = d.summary;
-  const match = matchAdvisor({ score: d.score, risk: d.risk, goals: manual.goals, preferences: {}, advisors: SAMPLE_ADVISORS, negativeFactors: d.actions });
   const { accounts } = useFinanceStore();
   const audioText = buildAudioSummaryText({
     periodLabel: d.label, summary: s, score: d.score,
@@ -114,7 +111,7 @@ function Overview() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <AIInsightsPanel />
-        <AdvisorMatchCard match={match} />
+        <RecommendedAdvisor compact />
       </div>
     </div>
   );

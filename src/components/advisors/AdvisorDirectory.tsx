@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { GlassCard, StatusBadge } from "@/components/common/Glass";
 import { Badge } from "@/components/ui/badge";
 import { FOCUS_LABELS, type AdvisorProfile } from "@/types/advisors";
+import { PersonalDirectory } from "./PersonalDirectory";
 import { getAdvisorProvider } from "@/services/advisors/advisorProvider";
 import { listAdvisorRecords } from "@/lib/reference.functions";
 import type { AdvisorRecord } from "@/lib/reference.server";
