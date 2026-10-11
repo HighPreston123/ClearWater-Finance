@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { PersistedState } from "@/services/storage/storageAdapter";
+import type { OnboardingState } from "./onboarding.functions";
 
 /**
  * Server-backed persistence of each signed-in user's financial state in TigerData.
@@ -45,6 +46,20 @@ export const loadUserState = createServerFn({ method: "GET" })
     const { readOwnerState } = await import("./tiger.server");
     const data = await withMfaRead(context, () => readOwnerState(context.userId));
     return data ? { data: JSON.parse(JSON.stringify(data)) } : null;
+  });
+
+/** Sign-in bootstrap: saved state + onboarding status from ONE database request (shared by the auth gate and the store). */
+export const loadSession = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { withMfaRead } = await import("./mfa.server");
+    const { readOwnerSession } = await import("./tiger.server");
+    const { sanitizeAnswers } = await import("./onboarding/quiz");
+    const { state, quiz } = await withMfaRead(context, () => readOwnerSession(context.userId));
+    const onboarding: OnboardingState = quiz
+      ? { status: quiz.status, answers: sanitizeAnswers(quiz.answers), completedAt: quiz.completed_at ? new Date(quiz.completed_at).toISOString() : null }
+      : { status: "not_started", answers: {}, completedAt: null };
+    return { data: state ? (JSON.parse(JSON.stringify(state)) as PersistedState) : null, onboarding };
   });
 
 // Data sections are optional: the client omits sections unchanged since its last successful save.

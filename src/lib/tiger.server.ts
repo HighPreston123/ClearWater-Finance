@@ -114,6 +114,17 @@ export async function readOwnerState(ownerId: string): Promise<PersistedState | 
   return mapState(row);
 }
 
+/**
+ * Sign-in bootstrap: saved state AND onboarding quiz status in one snapshot, one connection, one round trip —
+ * so sign-in costs a single database request instead of separate state + onboarding requests.
+ */
+export async function readOwnerSession(ownerId: string): Promise<{ state: PersistedState | null; quiz: any | null }> {
+  if (!UUID.test(ownerId)) throw new Error("Unauthorized: invalid owner");
+  const quizSql = `SELECT (SELECT to_jsonb(q) FROM (SELECT status, answers, completed_at FROM fin.onboarding_quiz WHERE user_id = '${ownerId}') q) AS quiz`;
+  const [stateRow, quizRow] = await ownerSnapshot(ownerId, [stateSql(ownerId), quizSql]);
+  return { state: mapState(stateRow), quiz: quizRow?.quiz ?? null };
+}
+
 function mapState(row: any): PersistedState | null {
   const settings = row?.settings;
   if (!settings) return null;

@@ -5,7 +5,7 @@ import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { cloudStorageAdapter } from "@/services/storage/cloudStorageAdapter";
 import { recordLogin } from "@/lib/state.functions";
-import { clearOnboardingStateCache } from "@/lib/onboarding/stateCache";
+import { clearOnboardingStateCache, takeSessionState } from "@/lib/onboarding/stateCache";
 import type { Category, DateRange, RecurringOverride, SavingsScenarioSettings, Transaction } from "@/types/finance";
 import type { Holding, InvestmentAccount } from "@/types/investments";
 import type { ManualFinancialInputs } from "@/types/risk";
@@ -150,12 +150,8 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     setSyncStatus("loading");
     setSyncError(null);
     try {
-      const remote = await Promise.race([
-        cloudStorageAdapter.load(),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Loading your saved data timed out. Please retry.")), 20000),
-        ),
-      ]);
+      // Shares the auth gate's sign-in request (state + quiz status in one database round trip).
+      const remote = await takeSessionState(uid);
       if (remote && isPersisted(remote)) {
         const clean = stripDemo(remote);
         const changed = clean !== remote && JSON.stringify(clean) !== JSON.stringify(remote);
@@ -202,8 +198,10 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         // Defer: calling auth/server functions inside this callback deadlocks the auth lock.
         setTimeout(() => {
           // Only an actual sign-in counts as a login (not page reloads / session restore).
-          if (event === "SIGNED_IN") recordLogin().catch((err) => console.error("Login record failed", err));
-          void syncFromCloud();
+          // Recorded after the load finishes so sign-in never opens two database connections at once.
+          void syncFromCloud().finally(() => {
+            if (event === "SIGNED_IN") recordLogin().catch((err) => console.error("Login record failed", err));
+          });
         }, 0);
       }
     });
