@@ -132,6 +132,8 @@ The team used the following tools during development:
 - **Lovable:** Front-end design and application scaffolding.
 - **Claude Sonnet 5.5:** CSV data creation.
 - **ChatGPT:** Repository review and README drafting.
+- **Alpaca:** Sample Data for risk analysis
+- **Tiger Cloud:** Tried to use as database but ended up not using for final product
 
 Alpaca supplies stock history, and Nessie supports the demo banking-data integration. TigerData was explored during development but is not the active database in the final prototype.
 
