@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CsvSettingsLink, CsvMiniLink } from "@/components/common/CsvHelp";
+import { CsvSettingsLink } from "@/components/common/CsvHelp";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { usePortfolio } from "@/store/useDerived";
 import { PageHeader, GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
@@ -26,8 +26,7 @@ function Investments() {
   const portfolio = usePortfolio();
   return (
     <div className="space-y-6">
-      <PageHeader title="Investments" subtitle="Your accounts and holdings. Values reflect each displayed valuation date."
-        right={<CsvMiniLink section="csv-holdings" label="Import holdings CSV" />} />
+      <PageHeader title="Investments" subtitle="Your accounts and holdings. Values reflect each displayed valuation date." />
       <CsvSettingsLink section="csv-holdings" title="Import your investments" text="Upload a brokerage CSV of your holdings in Settings. It explains each column and where to download it." />
       <GlassCard>
         <div className="flex flex-wrap items-end justify-between gap-3">
