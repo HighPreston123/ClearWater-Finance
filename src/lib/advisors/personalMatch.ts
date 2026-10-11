@@ -67,7 +67,7 @@ export function recommendAdvisors(
     const closest = matches.slice(0, othersLimit + 1);
     return { status: "ready", exact: false, best: null, others: closest, needs: input.needs };
   }
-  return { status: "ready", exact: true, best: ordered[0], others: ordered.slice(1, 1 + othersLimit), needs: input.needs };
+  return { status: "ready", exact: true, best: ordered[0] ?? null, others: ordered.slice(1, 1 + othersLimit), needs: input.needs };
 }
 
 /** Why a specific advisor may be relevant to this user (for profile views). */

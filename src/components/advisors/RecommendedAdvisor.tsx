@@ -7,7 +7,7 @@ import type { PersonalMatch } from "@/lib/advisors/personalMatch";
 
 function primaryOf(a: AdvisorRecord) { return a.categories.find((c) => c.role === "primary")?.label ?? a.title; }
 
-function MatchRow({ a, m, labels, big, onView }: { a: AdvisorRecord; m: PersonalMatch; labels: Record<string, string>; big?: boolean; onView?: (id: string) => void }) {
+function MatchRow({ a, m, labels, big, onView }: { a: AdvisorRecord; m: PersonalMatch; labels: Record<string, string>; big?: boolean; onView?: ((id: string) => void) | undefined }) {
   return (
     <div className="space-y-2 rounded-lg border border-border/50 p-3">
       <div className="flex flex-wrap items-baseline gap-2">
@@ -29,7 +29,7 @@ function MatchRow({ a, m, labels, big, onView }: { a: AdvisorRecord; m: Personal
 }
 
 /** "Your Recommended Advisor" — primary pick plus other advisors who may help. */
-export function RecommendedAdvisor({ compact, onView }: { compact?: boolean; onView?: (id: string) => void }) {
+export function RecommendedAdvisor({ compact, onView }: { compact?: boolean; onView?: ((id: string) => void) | undefined }) {
   const { advisors, assessment, rec, loading, error } = useAdvisorRecommendation();
   const byId = new Map((advisors ?? []).map((a) => [a.id, a]));
   const labels = assessment?.labels ?? {};
