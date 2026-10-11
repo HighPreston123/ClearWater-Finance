@@ -43,12 +43,28 @@ export interface AnalyticsResult {
 const rowsToBuckets = (rows: any[]): BucketRow[] =>
   rows.map((r) => ({ bucket: r.b, income: Number(r.income ?? 0), spending: Number(r.spending ?? 0), transfers: Number(r.transfers ?? 0), txnCount: Number(r.n ?? 0) }));
 
+const BUCKET_COLS = (dateCol: string, width: string, n: string) => `to_char(time_bucket(INTERVAL '${width}', ${dateCol}),'YYYY-MM-DD') AS b,
+    sum(amount_cents) FILTER (WHERE txn_type = 'income') AS income, sum(amount_cents) FILTER (WHERE txn_type = 'expense') AS spending,
+    sum(amount_cents) FILTER (WHERE txn_type = 'transfer') AS transfers, ${n} AS n`;
+const rowsJson = (inner: string) => `COALESCE((SELECT jsonb_agg(to_jsonb(q) ORDER BY q.b) FROM (${inner}) q), '[]')`;
+
 export async function getAnalytics(owner: string): Promise<AnalyticsResult> {
+  if (!/^[0-9a-f-]{36}$/i.test(owner)) throw new Error("Unauthorized: invalid owner");
   return withOwner(owner, async (tx) => {
-    const [b] = await tx<any[]>`SELECT to_char(min(txn_date),'YYYY-MM-DD') AS s, to_char(max(txn_date),'YYYY-MM-DD') AS e,
-      bool_or(is_sample) AS sample, array_remove(array_agg(DISTINCT CASE WHEN currency <> 'USD' THEN currency END), NULL) AS other,
-      max(updated_at) AS upd FROM fin.transactions WHERE user_id = ${owner}`;
-    const history = await loadScoreHistory(tx, owner);
+    // One statement (one snapshot): bounds, score history, and the direct monthly aggregation of the authoritative table.
+    const [head] = await tx.unsafe<any[]>(`SELECT
+      (SELECT to_jsonb(x) FROM (SELECT to_char(min(txn_date),'YYYY-MM-DD') AS s, to_char(max(txn_date),'YYYY-MM-DD') AS e,
+        bool_or(is_sample) AS sample, array_remove(array_agg(DISTINCT CASE WHEN currency <> 'USD' THEN currency END), NULL) AS other,
+        max(updated_at) AS upd FROM fin.transactions WHERE user_id = $1) x) AS b,
+      COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id::text, 'ps', to_char(period_start,'YYYY-MM-DD'), 'pe', to_char(period_end,'YYYY-MM-DD'),
+        'score', score, 'status', status, 'factors', factors, 'metrics', metrics, 'methodology_version', methodology_version,
+        'input_fingerprint', input_fingerprint, 'reconstructed', reconstructed, 'calculated_at', calculated_at, 'last_confirmed_at', last_confirmed_at)
+        ORDER BY period_start, last_confirmed_at)
+        FROM fin.wellness_score_history WHERE user_id = $1 AND score_type = $2), '[]') AS history,
+      ${rowsJson(`SELECT ${BUCKET_COLS("txn_date", "1 month", "count(*)")} FROM fin.transactions WHERE user_id = $1 AND currency = 'USD' GROUP BY 1`)} AS direct`,
+      [owner, SCORE_TYPE]);
+    const b = head?.b ?? {};
+    const history = mapScoreHistory(head?.history ?? []);
     const generatedAt = new Date().toISOString();
     if (!b?.s) {
       return { empty: true, bounds: null, includesSample: false, excludedCurrencies: [], source: "continuous_aggregate", reconciled: null,
@@ -57,38 +73,30 @@ export async function getAnalytics(owner: string): Promise<AnalyticsResult> {
     const bounds = { start: b.s as string, end: b.e as string };
     // Periods no longer complete in the dataset (e.g. after removing data) drop out of the main timeline.
     history.current = history.current.filter((r) => r.periodStart >= bounds.start && r.periodEnd <= bounds.end);
-
-    // Direct aggregation of the authoritative table (used to reconcile, and as fallback).
-    const direct = await tx<any[]>`SELECT to_char(time_bucket(INTERVAL '1 month', txn_date),'YYYY-MM-DD') AS b,
-        sum(amount_cents) FILTER (WHERE txn_type = 'income') AS income, sum(amount_cents) FILTER (WHERE txn_type = 'expense') AS spending,
-        sum(amount_cents) FILTER (WHERE txn_type = 'transfer') AS transfers, count(*) AS n
-      FROM fin.transactions WHERE user_id = ${owner} AND currency = 'USD' GROUP BY 1 ORDER BY 1`;
+    const direct: any[] = head.direct;
 
     let source: AnalyticsResult["source"] = "continuous_aggregate";
     let monthly: any[] = [], weekly: any[] = [], cats: any[] = [];
     try {
       await tx.savepoint(async (sp) => {
-        monthly = await sp<any[]>`SELECT to_char(time_bucket(INTERVAL '1 month', day),'YYYY-MM-DD') AS b,
-            sum(amount_cents) FILTER (WHERE txn_type = 'income') AS income, sum(amount_cents) FILTER (WHERE txn_type = 'expense') AS spending,
-            sum(amount_cents) FILTER (WHERE txn_type = 'transfer') AS transfers, sum(txn_count) AS n
-          FROM fin.owner_daily_activity(${bounds.start}::date, ${bounds.end}::date) WHERE currency = 'USD' GROUP BY 1 ORDER BY 1`;
-        weekly = await sp<any[]>`SELECT to_char(time_bucket(INTERVAL '1 week', day),'YYYY-MM-DD') AS b,
-            sum(amount_cents) FILTER (WHERE txn_type = 'income') AS income, sum(amount_cents) FILTER (WHERE txn_type = 'expense') AS spending,
-            sum(amount_cents) FILTER (WHERE txn_type = 'transfer') AS transfers, sum(txn_count) AS n
-          FROM fin.owner_daily_activity(${bounds.start}::date, ${bounds.end}::date) WHERE currency = 'USD' GROUP BY 1 ORDER BY 1`;
-        cats = await sp<any[]>`SELECT to_char(time_bucket(INTERVAL '1 month', day),'YYYY-MM-DD') AS b, category, sum(amount_cents) AS cents
-          FROM fin.owner_daily_activity(${bounds.start}::date, ${bounds.end}::date) WHERE currency = 'USD' AND txn_type = 'expense' GROUP BY 1, 2`;
+        // The owner-scoped aggregate is read once and bucketed three ways in a single statement.
+        const [r] = await sp.unsafe<any[]>(`WITH d AS MATERIALIZED (
+            SELECT * FROM fin.owner_daily_activity($1::date, $2::date) WHERE currency = 'USD')
+          SELECT ${rowsJson(`SELECT ${BUCKET_COLS("day", "1 month", "sum(txn_count)")} FROM d GROUP BY 1`)} AS monthly,
+                 ${rowsJson(`SELECT ${BUCKET_COLS("day", "1 week", "sum(txn_count)")} FROM d GROUP BY 1`)} AS weekly,
+                 COALESCE((SELECT jsonb_agg(to_jsonb(q)) FROM (SELECT to_char(time_bucket(INTERVAL '1 month', day),'YYYY-MM-DD') AS b, category, sum(amount_cents) AS cents
+                   FROM d WHERE txn_type = 'expense' GROUP BY 1, 2) q), '[]') AS cats`, [bounds.start, bounds.end]);
+        monthly = r?.monthly ?? []; weekly = r?.weekly ?? []; cats = r?.cats ?? [];
       });
     } catch (e) {
       console.error("[analytics] aggregate unavailable, using direct SQL", (e as Error).message);
       source = "direct_sql";
       monthly = direct;
-      weekly = await tx<any[]>`SELECT to_char(time_bucket(INTERVAL '1 week', txn_date),'YYYY-MM-DD') AS b,
-          sum(amount_cents) FILTER (WHERE txn_type = 'income') AS income, sum(amount_cents) FILTER (WHERE txn_type = 'expense') AS spending,
-          sum(amount_cents) FILTER (WHERE txn_type = 'transfer') AS transfers, count(*) AS n
-        FROM fin.transactions WHERE user_id = ${owner} AND currency = 'USD' GROUP BY 1 ORDER BY 1`;
-      cats = await tx<any[]>`SELECT to_char(time_bucket(INTERVAL '1 month', txn_date),'YYYY-MM-DD') AS b, category, sum(amount_cents) AS cents
-        FROM fin.transactions WHERE user_id = ${owner} AND currency = 'USD' AND txn_type = 'expense' GROUP BY 1, 2`;
+      const [r] = await tx.unsafe<any[]>(`SELECT
+          ${rowsJson(`SELECT ${BUCKET_COLS("txn_date", "1 week", "count(*)")} FROM fin.transactions WHERE user_id = $1 AND currency = 'USD' GROUP BY 1`)} AS weekly,
+          COALESCE((SELECT jsonb_agg(to_jsonb(q)) FROM (SELECT to_char(time_bucket(INTERVAL '1 month', txn_date),'YYYY-MM-DD') AS b, category, sum(amount_cents) AS cents
+            FROM fin.transactions WHERE user_id = $1 AND currency = 'USD' AND txn_type = 'expense' GROUP BY 1, 2) q), '[]') AS cats`, [owner]);
+      weekly = r?.weekly ?? []; cats = r?.cats ?? [];
     }
 
     const months = toPeriods(rowsToBuckets(monthly), "month", bounds);
@@ -112,10 +120,7 @@ export async function getAnalytics(owner: string): Promise<AnalyticsResult> {
   });
 }
 
-async function loadScoreHistory(tx: any, owner: string) {
-  const rows = await tx`SELECT id::text, to_char(period_start,'YYYY-MM-DD') ps, to_char(period_end,'YYYY-MM-DD') pe, score, status, factors, metrics,
-      methodology_version, input_fingerprint, reconstructed, calculated_at, last_confirmed_at
-    FROM fin.wellness_score_history WHERE user_id = ${owner} AND score_type = ${SCORE_TYPE} ORDER BY period_start, last_confirmed_at`;
+function mapScoreHistory(rows: any[]) {
   const revisions: ScoreRevision[] = rows.map((r: any) => ({
     id: r.id, periodStart: r.ps, periodEnd: r.pe, score: r.score, status: r.status, factors: r.factors, metrics: r.metrics,
     methodologyVersion: r.methodology_version, fingerprint: r.input_fingerprint, reconstructed: r.reconstructed,
