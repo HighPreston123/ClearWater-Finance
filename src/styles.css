@@ -207,3 +207,69 @@
 @utility animate-aero-float {
   animation: aero-float 9s ease-in-out infinite;
 }
+
+/* ---------- Aquatic Neo-Aero accents ---------- */
+@utility aqua-cursor {
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='32' viewBox='0 0 28 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e6fbff' stop-opacity='.95'/%3E%3Cstop offset='.55' stop-color='%2363c8e8' stop-opacity='.8'/%3E%3Cstop offset='1' stop-color='%231f86c4' stop-opacity='.9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M3 2 L3 25 L9 19.5 L13 29 L17.5 27 L13.6 17.8 L22 17.8 Z' fill='url(%23g)' stroke='%230b3d63' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M5.5 6 L5.5 15 L11 10.5 Z' fill='white' fill-opacity='.75'/%3E%3C/svg%3E") 3 2, auto;
+  & a, & button, & [role="button"], & [role="tab"], & label, & summary, & select {
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='32' viewBox='0 0 28 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23f0fff4' stop-opacity='.95'/%3E%3Cstop offset='.55' stop-color='%2370d6b0' stop-opacity='.85'/%3E%3Cstop offset='1' stop-color='%231f9c8a' stop-opacity='.9'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M3 2 L3 25 L9 19.5 L13 29 L17.5 27 L13.6 17.8 L22 17.8 Z' fill='url(%23g)' stroke='%230b4a40' stroke-width='2' stroke-linejoin='round'/%3E%3Cpath d='M5.5 6 L5.5 15 L11 10.5 Z' fill='white' fill-opacity='.8'/%3E%3C/svg%3E") 3 2, pointer;
+  }
+  & input, & textarea { cursor: text; }
+}
+
+.aqua-ambience {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.aqua-caustics {
+  position: absolute;
+  inset: -20%;
+  opacity: 0.35;
+  background:
+    radial-gradient(ellipse 30% 18% at 20% 30%, oklch(1 0 0 / 0.6), transparent 70%),
+    radial-gradient(ellipse 22% 14% at 70% 20%, oklch(0.95 0.06 200 / 0.6), transparent 70%),
+    radial-gradient(ellipse 26% 16% at 55% 75%, oklch(0.95 0.07 185 / 0.5), transparent 70%);
+  animation: aqua-caustic 24s ease-in-out infinite alternate;
+}
+.aqua-bubble {
+  position: absolute;
+  bottom: -80px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 32% 28%, oklch(1 0 0 / 0.9) 0 12%, oklch(1 0 0 / 0.15) 30%, oklch(0.85 0.08 210 / 0.12) 70%, oklch(0.75 0.1 210 / 0.35) 100%);
+  border: 1px solid oklch(1 0 0 / 0.55);
+  box-shadow: inset -3px -4px 8px oklch(0.7 0.1 210 / 0.25);
+  animation: aqua-rise linear infinite;
+}
+.aqua-ripple {
+  position: fixed;
+  z-index: 60;
+  width: 10px;
+  height: 10px;
+  margin: -5px 0 0 -5px;
+  border-radius: 9999px;
+  border: 2px solid oklch(0.75 0.12 210 / 0.7);
+  pointer-events: none;
+  animation: aqua-ripple 600ms ease-out forwards;
+}
+@keyframes aqua-rise {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 0.9; }
+  50% { transform: translate(18px, -55vh); }
+  90% { opacity: 0.8; }
+  100% { transform: translate(-10px, -115vh); opacity: 0; }
+}
+@keyframes aqua-caustic {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(4%, -3%) scale(1.08); }
+}
+@keyframes aqua-ripple {
+  from { transform: scale(1); opacity: 1; }
+  to { transform: scale(6); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .aqua-bubble, .aqua-caustics { animation: none; }
+  .aqua-bubble { display: none; }
+}
