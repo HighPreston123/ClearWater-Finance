@@ -10,6 +10,6 @@ for (const u of users) {
   const [oa, oat] = await t(() => OA.getAnalytics(u));
   const [na, nat] = await t(() => NA.getAnalytics(u));
   console.log(u.slice(0, 8), "state equal:", isDeepStrictEqual(norm(os), norm(ns)), `load ${ot}→${nt}ms`, "| analytics equal:", isDeepStrictEqual(norm(oa), norm(na)), `${oat}→${nat}ms`, "txns", os?.transactions.length ?? "none");
-  if (!isDeepStrictEqual(norm(os), norm(ns))) { const a = norm(os), b = norm(ns); for (const k of Object.keys(a ?? {})) if (!isDeepStrictEqual(a[k], b?.[k])) console.log("  diff", k, JSON.stringify(a[k]).slice(0, 200), "||", JSON.stringify(b?.[k]).slice(0, 200)); }
-  if (!isDeepStrictEqual(norm(oa), norm(na))) { const a = norm(oa), b = norm(na); for (const k of Object.keys(a)) if (!isDeepStrictEqual(a[k], b[k])) console.log("  adiff", k, JSON.stringify(a[k]).slice(0, 200), "||", JSON.stringify(b[k]).slice(0, 200)); }
+  if (!isDeepStrictEqual(norm(os), norm(ns))) { const a = norm(os), b = norm(ns); for (const k of Object.keys(a ?? {})) if (!isDeepStrictEqual(a[k], b?.[k])) console.log("  diff", k, String(JSON.stringify(a[k])).slice(0, 300), "||", String(JSON.stringify(b?.[k])).slice(0, 300)); }
+  if (!isDeepStrictEqual(norm(oa), norm(na))) { const a = norm(oa), b = norm(na); for (const k of Object.keys(a)) if (!isDeepStrictEqual(a[k], b[k])) console.log("  adiff", k, String(JSON.stringify(a[k])).slice(0, 300), "||", JSON.stringify(b[k]).slice(0, 200)); }
 }
