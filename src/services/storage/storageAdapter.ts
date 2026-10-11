@@ -49,8 +49,17 @@ export const localStorageAdapter: StorageAdapter = {
   },
 };
 
+export interface RemoteSaveResult {
+  /** "skipped" when no transactions changed, so analytics/scores were not recalculated. */
+  analytics: "refreshed" | "skipped" | "failed";
+}
+
 /** Server-backed (TigerData) adapter. Async; the owner is derived from the verified session on the server. */
 export interface RemoteStorageAdapter {
   load(): Promise<PersistedState | null>;
-  save(state: PersistedState): Promise<void>;
+  /**
+   * Saves `state`. With `previous` (the last state this adapter saved successfully), data sections
+   * that are unchanged by reference are omitted so the server skips them.
+   */
+  save(state: PersistedState, previous?: PersistedState | null): Promise<RemoteSaveResult>;
 }

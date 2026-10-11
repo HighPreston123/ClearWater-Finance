@@ -5,6 +5,7 @@ import { useRouter } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { cloudStorageAdapter } from "@/services/storage/cloudStorageAdapter";
 import { recordLogin } from "@/lib/state.functions";
+import { clearOnboardingStateCache } from "@/lib/onboarding/stateCache";
 import type { Category, DateRange, RecurringOverride, SavingsScenarioSettings, Transaction } from "@/types/finance";
 import type { Holding, InvestmentAccount } from "@/types/investments";
 import type { ManualFinancialInputs } from "@/types/risk";
@@ -65,6 +66,8 @@ export type SyncStatus = "idle" | "loading" | "synced" | "saving" | "load_error"
 interface Store extends PersistedState {
   range: DateRange;
   hydrated: boolean;
+  /** Signed-in user id (from the local session) — used to scope cached queries. */
+  userId: string | null;
   /** Cloud (TigerData) sync state. On load_error, saving is paused so stale/sample data never overwrites saved data. */
   syncStatus: SyncStatus;
   syncError: string | null;
@@ -105,12 +108,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const [undoStack, setUndoStack] = useState<UndoEntry[]>([]);
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const skipSave = useRef(true);
   const authedRef = useRef(false);
   const stateRef = useRef(state);
   stateRef.current = state;
   const undoRef = useRef(undoStack);
   undoRef.current = undoStack;
+  /** Last state confirmed saved in the cloud — unchanged sections (by reference) are omitted from saves. */
+  const lastSavedRef = useRef<PersistedState | null>(null);
+  /** Bumped on sign-out / account change so late save responses from a previous session are ignored. */
+  const sessionGenRef = useRef(0);
+  const userIdRef = useRef<string | null>(null);
+  const savingRef = useRef(false);
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -124,7 +134,19 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
   const syncFromCloud = useCallback(async () => {
     const { data } = await supabase.auth.getSession();
     if (!data.session) return;
+    const uid = data.session.user.id;
+    if (userIdRef.current !== uid) {
+      // Different account in this tab: drop anything cached for the previous one.
+      if (userIdRef.current) {
+        sessionGenRef.current++;
+        clearOnboardingStateCache();
+        queryClient.clear();
+      }
+      userIdRef.current = uid;
+      setUserId(uid);
+    }
     authedRef.current = false; // no cloud saves until the saved state has loaded
+    lastSavedRef.current = null;
     setSyncStatus("loading");
     setSyncError(null);
     try {
@@ -138,13 +160,17 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         const clean = stripDemo(remote);
         const changed = clean !== remote && JSON.stringify(clean) !== JSON.stringify(remote);
         skipSave.current = !changed; // persist the cleanup so demo data doesn't come back
+        // When cleanup changed data, compare against the stored version so the cleaned sections are sent.
+        lastSavedRef.current = changed ? remote : clean;
         setState(clean);
         localStorageAdapter.save(clean);
       } else if (!remote) {
         // Brand-new account: start from a blank slate, not this browser's demo data.
+        const blank = emptyState();
         skipSave.current = true;
-        setState(emptyState());
-        await cloudStorageAdapter.save(emptyState());
+        setState(blank);
+        await cloudStorageAdapter.save(blank, null);
+        lastSavedRef.current = blank;
       }
       authedRef.current = true;
       setSyncStatus("synced");
@@ -153,13 +179,18 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       setSyncStatus("load_error");
       setSyncError(err instanceof Error ? err.message : "Could not load your saved data");
     }
-  }, []);
+  }, [queryClient]);
 
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "INITIAL_SESSION") return;
       if (event === "SIGNED_OUT") {
         authedRef.current = false;
+        sessionGenRef.current++;
+        lastSavedRef.current = null;
+        userIdRef.current = null;
+        setUserId(null);
+        clearOnboardingStateCache();
         setSyncStatus("idle");
         localStorageAdapter.clear();
         void queryClient.cancelQueries();
@@ -179,34 +210,64 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
     return () => data.subscription.unsubscribe();
   }, [syncFromCloud, queryClient, router]);
 
+  /**
+   * Serialized cloud save: one request at a time; edits made while a save is in flight are
+   * coalesced into one follow-up save of the newest state, so an older request can never
+   * overwrite newer changes.
+   */
+  const flushCloud = useCallback(async () => {
+    if (savingRef.current || !authedRef.current) return;
+    savingRef.current = true;
+    const gen = sessionGenRef.current;
+    try {
+      while (authedRef.current && gen === sessionGenRef.current && stateRef.current !== lastSavedRef.current) {
+        const target = stateRef.current;
+        setSyncStatus("saving");
+        try {
+          const r = await cloudStorageAdapter.save(target, lastSavedRef.current);
+          if (gen !== sessionGenRef.current) return;
+          lastSavedRef.current = target;
+          setSyncError(null);
+          // Summaries were refreshed server-side only when transactions changed.
+          if (r.analytics !== "skipped") void queryClient.invalidateQueries({ queryKey: ["tiger-analytics"] });
+        } catch (err) {
+          if (gen !== sessionGenRef.current) return;
+          console.error("Cloud save failed", err);
+          setSyncStatus("save_error");
+          setSyncError(err instanceof Error ? err.message : "Could not save");
+          return; // the next edit retries (unchanged sections are still diffed against the last good save)
+        }
+      }
+      if (gen === sessionGenRef.current && authedRef.current) setSyncStatus("synced");
+    } finally {
+      savingRef.current = false;
+    }
+  }, [queryClient]);
+
   useEffect(() => {
     if (!hydrated) return;
     if (skipSave.current) {
       skipSave.current = false;
       return;
     }
-    localStorageAdapter.save(state);
-    if (!authedRef.current) return;
-    const t = setTimeout(() => {
-      setSyncStatus("saving");
-      cloudStorageAdapter
-        .save(state)
-        .then(() => {
-          setSyncStatus("synced");
-          setSyncError(null);
-          // Saved to TigerData and summaries refreshed server-side → re-fetch the analytics shown on the site.
-          void queryClient.invalidateQueries({ queryKey: ["tiger-analytics"] });
-        })
-        .catch((err) => {
-          console.error("Cloud save failed", err);
-          setSyncStatus("save_error");
-          setSyncError(err instanceof Error ? err.message : "Could not save");
-        });
-    }, 800);
-    return () => clearTimeout(t);
-  }, [state, hydrated]);
+    // Debounce both the local cache write and the cloud save so slider drags don't
+    // re-serialize the whole dataset on every tick.
+    const local = setTimeout(() => localStorageAdapter.save(stateRef.current), 400);
+    const cloud = authedRef.current ? setTimeout(() => void flushCloud(), 800) : null;
+    return () => {
+      clearTimeout(local);
+      if (cloud) clearTimeout(cloud);
+    };
+  }, [state, hydrated, flushCloud]);
 
-  const range = state.range ?? defaultRange(state.transactions);
+  // Don't lose the last debounced local write when the tab closes.
+  useEffect(() => {
+    const onHide = () => { if (authedRef.current || stateRef.current.transactions.length) localStorageAdapter.save(stateRef.current); };
+    window.addEventListener("pagehide", onHide);
+    return () => window.removeEventListener("pagehide", onHide);
+  }, []);
+
+  const range = useMemo(() => state.range ?? defaultRange(state.transactions), [state.range, state.transactions]);
 
   const recategorize = useCallback((ids: string[], category: Category, label?: string) => {
     const prev = stateRef.current.transactions;
@@ -226,6 +287,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       ...state,
       range,
       hydrated,
+      userId,
       syncStatus,
       syncError,
       retrySync: () => void syncFromCloud(),
@@ -242,10 +304,15 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
       updateHoldingPrices: (prices) =>
         setState((s) => {
           if (!Object.keys(prices).length) return s;
-          return { ...s, holdings: s.holdings.map((h) => {
+          let changed = false;
+          const holdings = s.holdings.map((h) => {
             const p = h.symbol ? prices[h.symbol.toUpperCase()] : undefined;
-            return p && Number(p.price) > 0 ? { ...h, latestPrice: p.price, priceTimestamp: p.ts } : h;
-          }) };
+            if (!p || !(Number(p.price) > 0) || (h.latestPrice === p.price && h.priceTimestamp === p.ts)) return h;
+            changed = true;
+            return { ...h, latestPrice: p.price, priceTimestamp: p.ts };
+          });
+          // Same prices and timestamps → keep the existing state (no re-render, no save).
+          return changed ? { ...s, holdings } : s;
         }),
       updateManual: (patch) => setState((s) => ({ ...s, manual: { ...s.manual, ...patch, updatedAt: new Date().toISOString() } })),
       setSavings: (sv) => setState((s) => ({ ...s, savings: sv })),
@@ -287,7 +354,7 @@ export function FinanceProvider({ children }: { children: ReactNode }) {
         setState(initialState());
       },
     }),
-    [state, range, hydrated, undoStack, recategorize, undo, syncStatus, syncError, syncFromCloud],
+    [state, range, hydrated, userId, undoStack, recategorize, undo, syncStatus, syncError, syncFromCloud],
   );
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

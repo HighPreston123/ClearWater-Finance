@@ -47,13 +47,22 @@ export const loadUserState = createServerFn({ method: "GET" })
     return data ? { data: JSON.parse(JSON.stringify(data)) } : null;
   });
 
+// Data sections are optional: the client omits sections unchanged since its last successful save.
+// accounts and holdings must arrive together (holdings reference accounts).
+const patchSchema = stateSchema
+  .partial({ transactions: true, recurringOverrides: true, accounts: true, holdings: true })
+  .refine((s) => (s.accounts === undefined) === (s.holdings === undefined), "accounts and holdings must be sent together");
+
 export const saveUserState = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => stateSchema.parse(input))
+  .inputValidator((input: unknown) => patchSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertMfa(context);
     const { withOwner, writeState } = await import("./tiger.server");
-    await withOwner(context.userId, (tx) => writeState(tx, context.userId, data as unknown as PersistedState));
+    const { transactionsChanged } = await withOwner(context.userId, (tx) =>
+      writeState(tx, context.userId, data as unknown as import("./tiger.server").StatePatch));
+    // Analytics and scores depend only on transactions — skip the refresh when none changed.
+    if (!transactionsChanged) return { ok: true as const, analytics: "skipped" as const };
     // Saved. Now refresh the affected TigerData summaries and rescore; a failure here never undoes the save.
     try {
       const { afterTransactionsChanged } = await import("./analytics.server");

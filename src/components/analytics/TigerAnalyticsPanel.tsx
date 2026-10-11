@@ -17,10 +17,10 @@ import { cn } from "@/lib/utils";
 const KEY = ["tiger-analytics"];
 
 export function TigerAnalyticsPanel() {
-  const { syncStatus, retrySync } = useFinanceStore();
+  const { syncStatus, retrySync, userId } = useFinanceStore();
   const qc = useQueryClient();
   const ready = syncStatus === "synced" || syncStatus === "saving" || syncStatus === "save_error";
-  const q = useQuery({ queryKey: KEY, queryFn: () => getAnalytics(), enabled: ready, retry: 1 });
+  const q = useQuery({ queryKey: [...KEY, userId], queryFn: () => getAnalytics(), enabled: ready && !!userId, retry: 1, staleTime: 60_000 });
 
   const refresh = useMutation({
     mutationFn: () => refreshAnalysis(),

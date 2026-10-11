@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { RefreshCw, Plus, X } from "lucide-react";
 import { GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
@@ -9,70 +10,103 @@ import { useFinanceStore } from "@/store/FinanceStore";
 import { getDailyBars, getLatestPrices, getWatchlist, setWatchSymbol } from "@/lib/marketdata.functions";
 
 type Latest = { symbol: string; price: string | null; tradeTs: string | null; fetchedAt: string; status: string };
-type Bars = { symbol: string; bars: { t: string; c: number; fetchedAt: string }[] };
 const DEFAULT_WATCH = ["AAPL", "MSFT", "SPY"];
 const SYM = /^[A-Z][A-Z0-9.]{0,9}$/;
+const FAIL = { status: "error" as const, message: "Market data request failed." };
 
 const fmtTs = (iso: string | null) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "—");
 const isStale = (iso: string | null) => !iso || Date.now() - new Date(iso).getTime() > 15 * 60_000;
 
+/**
+ * Watchlist, latest prices, and daily bars are cached queries scoped to the signed-in user,
+ * so returning to Investments shows the last results immediately. Bars are keyed by symbol,
+ * so a slow response for a previously clicked symbol can never replace the current chart.
+ */
 export function MarketDataCard() {
-  const { holdings, updateHoldingPrices } = useFinanceStore();
+  const { holdings, updateHoldingPrices, userId } = useFinanceStore();
+  const qc = useQueryClient();
   const fetchLatest = useServerFn(getLatestPrices);
   const fetchBars = useServerFn(getDailyBars);
   const fetchWatch = useServerFn(getWatchlist);
   const saveWatch = useServerFn(setWatchSymbol);
 
-  const [watch, setWatch] = useState<string[]>([]);
-  const [latest, setLatest] = useState<Record<string, Latest>>({});
-  const [chart, setChart] = useState<Bars | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [newSym, setNewSym] = useState("");
 
-  const owned = useMemo(() => [...new Set(holdings.map((h) => h.symbol?.toUpperCase()).filter((s): s is string => !!s && SYM.test(s)))], [holdings]);
-  const all = useMemo(() => [...new Set([...watch, ...owned])], [watch, owned]);
-
-  useEffect(() => {
-    fetchWatch().then(async (w) => {
+  const watchKey = ["market-watchlist", userId] as const;
+  const watchQ = useQuery({
+    queryKey: watchKey,
+    enabled: !!userId,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      let w = await fetchWatch();
       if (w.length === 0) {
         for (const s of DEFAULT_WATCH) await saveWatch({ data: { symbol: s, add: true } });
         w = DEFAULT_WATCH;
       }
-      setWatch(w);
-    }).catch(() => setError("Could not load your watchlist."));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+      return w;
+    },
+  });
+  const watch = useMemo(() => watchQ.data ?? [], [watchQ.data]);
 
-  async function refresh() {
-    if (!all.length) return;
-    setBusy(true); setError(null);
-    const r = await fetchLatest({ data: { symbols: all.slice(0, 50) } }).catch(() => ({ status: "error" as const, message: "Market data request failed." }));
-    setBusy(false);
-    if (r.status !== "ok") return setError(r.message);
-    const map = Object.fromEntries(r.data.map((q) => [q.symbol, q]));
-    setLatest(map);
-    // Only holdings the user already owns are re-priced; unsupported symbols keep no price (never zero).
-    updateHoldingPrices(Object.fromEntries(r.data.filter((q) => q.status === "ok" && q.price && owned.includes(q.symbol)).map((q) => [q.symbol, { price: q.price!, ts: q.tradeTs! }])));
+  const owned = useMemo(() => [...new Set(holdings.map((h) => h.symbol?.toUpperCase()).filter((s): s is string => !!s && SYM.test(s)))], [holdings]);
+  const all = useMemo(() => [...new Set([...watch, ...owned])], [watch, owned]);
+  const symbolsKey = all.slice(0, 50).join(",");
+
+  const latestQ = useQuery({
+    queryKey: ["market-latest", userId, symbolsKey],
+    enabled: !!userId && all.length > 0,
+    staleTime: 60_000, // matches the server's ~60s latest-trade cache
+    placeholderData: (prev) => prev,
+    queryFn: () => fetchLatest({ data: { symbols: symbolsKey.split(",") } }).catch(() => FAIL),
+  });
+  const latest = useMemo<Record<string, Latest>>(
+    () => (latestQ.data?.status === "ok" ? Object.fromEntries(latestQ.data.data.map((q) => [q.symbol, q])) : {}),
+    [latestQ.data],
+  );
+
+  // Only holdings the user already owns are re-priced; unsupported symbols keep no price (never zero).
+  // updateHoldingPrices returns the same state when prices/timestamps are unchanged.
+  useEffect(() => {
+    if (latestQ.data?.status !== "ok") return;
+    updateHoldingPrices(Object.fromEntries(latestQ.data.data.filter((q) => q.status === "ok" && q.price && owned.includes(q.symbol)).map((q) => [q.symbol, { price: q.price!, ts: q.tradeTs! }])));
+  }, [latestQ.data]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const barsQ = useQuery({
+    queryKey: ["market-bars", userId, selected],
+    enabled: !!userId && !!selected,
+    staleTime: 10 * 60_000,
+    queryFn: () => fetchBars({ data: { symbol: selected!, days: 365 } }).catch(() => FAIL),
+  });
+  const chart = barsQ.data?.status === "ok" ? barsQ.data.data : null;
+
+  const busy = latestQ.isFetching;
+  const error = actionError
+    ?? (watchQ.isError ? "Could not load your watchlist." : null)
+    ?? (latestQ.data && latestQ.data.status !== "ok" ? latestQ.data.message : null)
+    ?? (selected && barsQ.data && barsQ.data.status !== "ok" ? barsQ.data.message : null);
+
+  function refresh() {
+    setActionError(null);
+    void latestQ.refetch();
   }
-
-  async function openChart(symbol: string) {
-    setSelected(symbol); setChart(null); setError(null);
-    const r = await fetchBars({ data: { symbol, days: 365 } }).catch(() => ({ status: "error" as const, message: "Market data request failed." }));
-    if (r.status !== "ok") return setError(r.message);
-    setChart(r.data);
+  function openChart(symbol: string) {
+    setActionError(null);
+    setSelected(symbol);
   }
-
-  useEffect(() => { if (all.length) refresh(); }, [all.join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
-
   async function add() {
     const s = newSym.trim().toUpperCase();
     if (!SYM.test(s) || watch.includes(s)) return;
-    await saveWatch({ data: { symbol: s, add: true } }).then(() => setWatch((w) => [...w, s])).catch(() => setError("Could not add symbol (limit 25)."));
+    await saveWatch({ data: { symbol: s, add: true } })
+      .then(() => qc.setQueryData<string[]>(watchKey, (w) => [...(w ?? []), s]))
+      .catch(() => setActionError("Could not add symbol (limit 25)."));
     setNewSym("");
   }
   async function remove(s: string) {
-    await saveWatch({ data: { symbol: s, add: false } }).then(() => setWatch((w) => w.filter((x) => x !== s))).catch(() => {});
+    await saveWatch({ data: { symbol: s, add: false } })
+      .then(() => qc.setQueryData<string[]>(watchKey, (w) => (w ?? []).filter((x) => x !== s)))
+      .catch(() => {});
   }
 
   return (

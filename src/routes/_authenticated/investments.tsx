@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Download } from "lucide-react";
 import { useFinanceStore } from "@/store/FinanceStore";
-import { useDerived } from "@/store/useDerived";
+import { usePortfolio } from "@/store/useDerived";
 import { PageHeader, GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
 import { Button } from "@/components/ui/button";
 import { AllocationChart } from "@/components/investments/AllocationChart";
@@ -25,7 +25,7 @@ export const Route = createFileRoute("/_authenticated/investments")({
 
 function Investments() {
   const { accounts, holdings } = useFinanceStore();
-  const { portfolio } = useDerived();
+  const portfolio = usePortfolio();
   return (
     <div className="space-y-6">
       <PageHeader title="Investments" subtitle="Your accounts and holdings. Values reflect each displayed valuation date."
