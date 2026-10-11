@@ -46,7 +46,7 @@ function AuthPage() {
       return;
     }
     const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "PASSWORD_RECOVERY") navigate({ to: "/reset-password", replace: true });
+      if (event === "PASSWORD_RECOVERY") navigate({ to: "/reset-password", hash: "type=recovery", replace: true });
     });
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/", replace: true });
