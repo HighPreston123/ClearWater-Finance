@@ -34,7 +34,6 @@ function Onboarding() {
   const [firstName, setFirstName] = useState("there");
   const [uid, setUid] = useState<string | null>(null);
   const [answers, setAnswers] = useState<QuizAnswers>({});
-  const [index, setIndex] = useState(0);
   const [missing, setMissing] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -58,11 +57,9 @@ function Onboarding() {
           navigate({ to: "/", replace: true });
           return;
         }
-        restored = { ...restored, ...s.answers };
+      restored = { ...restored, ...s.answers };
       } catch { /* offline: continue with local progress */ }
       setAnswers(restored);
-      const firstGap = missingQuestions(restored)[0];
-      setIndex(firstGap ?? TOTAL - 1);
       setStep(Object.keys(restored).length ? "quiz" : "welcome");
     })();
   }, [navigate]);
@@ -78,13 +75,13 @@ function Onboarding() {
 
   const finish = async () => {
     const gaps = missingQuestions(answers);
-    if (gaps.length) { setMissing(gaps); setIndex(gaps[0]!); return; }
+    if (gaps.length) { setMissing(gaps); return; }
     setSubmitting(true);
     setError(null);
     try {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       const r = await complete({ data: { answers } });
-      if (r.status === "missing") { setMissing(r.missing); setIndex(r.missing[0]!); return; }
+      if (r.status === "missing") { setMissing(r.missing); return; }
       await supabase.auth.updateUser({ data: { onboarding_pending: false } });
       if (uid) localStorage.removeItem(LOCAL_KEY(uid));
       if (uid) markOnboardingCompleted(uid);
@@ -96,7 +93,6 @@ function Onboarding() {
     }
   };
 
-  const q = QUIZ_QUESTIONS[index]!;
   const answeredCount = TOTAL - missingQuestions(answers).length;
 
   return (
@@ -149,68 +145,78 @@ function Onboarding() {
             </ul>
             <div className="mt-8 flex flex-wrap gap-3">
               <Button variant="glass" size="lg" className="h-12" onClick={() => setStep("welcome")}><ArrowLeft aria-hidden /> Back</Button>
-              <Button variant="aero" size="lg" className="h-12 px-8 text-base" onClick={() => { setIndex(0); setStep("quiz"); }}>Start Quiz <ArrowRight aria-hidden /></Button>
+              <Button variant="aero" size="lg" className="h-12 px-8 text-base" onClick={() => setStep("quiz")}>Start Quiz <ArrowRight aria-hidden /></Button>
             </div>
           </section>
         )}
 
         {step === "quiz" && (
-          <section className="glass-surface rounded-[2rem] p-6 sm:p-10" aria-labelledby="quiz-q">
+          <section className="glass-surface rounded-[2rem] p-6 sm:p-10" aria-labelledby="quiz-heading">
             <div className="flex items-center justify-between text-sm font-semibold text-foreground/80">
-              <span>Question {index + 1} of {TOTAL}</span>
-              <span className="text-xs text-muted-foreground">{answeredCount} answered</span>
+              <span id="quiz-heading">Getting to know you</span>
+              <span className="text-xs text-muted-foreground">{answeredCount} of {TOTAL} answered</span>
             </div>
             <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={TOTAL} aria-valuenow={answeredCount} aria-label="Quiz progress">
               <div className="aero-water h-full rounded-full transition-[width] duration-700 ease-out" style={{ width: `${(answeredCount / TOTAL) * 100}%` }} />
             </div>
 
-            <div key={q.id} className="animate-aero-rise">
-              <h2 id="quiz-q" className="mt-8 font-display text-2xl font-extrabold leading-snug text-foreground">{q.text}</h2>
-              {missing.includes(index) && <p className="mt-2 text-sm font-semibold text-destructive" role="alert">Please choose an answer for this question.</p>}
-              <div role="radiogroup" aria-labelledby="quiz-q" className="mt-6 grid gap-3">
-                {q.options.map((o, i) => {
-                  const selected = answers[q.id] === o.id;
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={selected}
-                      onClick={() => choose(q.id, o.id)}
-                      className={cn(
-                        "flex min-h-14 items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-base transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                        selected ? "border-primary bg-primary/10 font-semibold text-foreground shadow-aero" : "border-transparent bg-card hover:border-primary/40",
-                      )}
-                    >
-                      <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold", selected ? "aero-gloss text-primary-foreground" : "bg-muted text-foreground/70")}>
-                        {selected ? <Check className="h-4 w-4" aria-hidden /> : String.fromCharCode(65 + i)}
-                      </span>
-                      {o.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
+            <ol className="mt-8 space-y-10">
+              {QUIZ_QUESTIONS.map((q, i) => {
+                return (
+                  <li key={q.id} id={`quiz-question-${i}`} className="animate-aero-rise">
+                    <h2 id={`quiz-q-${i}`} className="font-display text-xl font-extrabold leading-snug text-foreground">
+                      <span className="mr-2 text-primary">{i + 1}.</span>{q.text}
+                    </h2>
+                    {missing.includes(i) && <p className="mt-2 text-sm font-semibold text-destructive" role="alert">Please choose an answer for this question.</p>}
+                    <div role="radiogroup" aria-labelledby={`quiz-q-${i}`} className="mt-4 grid gap-3">
+                      {q.options.map((o, j) => {
+                        const chosen = answers[q.id] === o.id;
+                        return (
+                          <button
+                            key={o.id}
+                            type="button"
+                            role="radio"
+                            aria-checked={chosen}
+                            onClick={() => choose(q.id, o.id)}
+                            className={cn(
+                              "flex min-h-14 items-center gap-3 rounded-2xl border-2 px-4 py-3 text-left text-base transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                              chosen ? "border-primary bg-primary/10 font-semibold text-foreground shadow-aero" : "border-transparent bg-card hover:border-primary/40",
+                            )}
+                          >
+                            <span className={cn("flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-sm font-bold", chosen ? "aero-gloss text-primary-foreground" : "bg-muted text-foreground/70")}>
+                              {chosen ? <Check className="h-4 w-4" aria-hidden /> : String.fromCharCode(65 + j)}
+                            </span>
+                            {o.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
 
             {missing.length > 0 && (
-              <div className="mt-6 rounded-2xl border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">
+              <div className="mt-8 rounded-2xl border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">
                 <p className="font-semibold">A few questions still need an answer:</p>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {missing.map((i) => (
-                    <button key={i} type="button" onClick={() => setIndex(i)} className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-primary hover:underline">Question {i + 1}</button>
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => document.getElementById(`quiz-question-${i}`)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                      className="rounded-full bg-card px-3 py-1 text-xs font-semibold text-primary hover:underline"
+                    >
+                      Question {i + 1}
+                    </button>
                   ))}
                 </div>
               </div>
             )}
             {error && <p className="mt-4 rounded-2xl border border-destructive/40 bg-destructive/5 p-3 text-sm" role="alert">{error}</p>}
 
-            <div className="mt-8 flex items-center justify-between gap-3">
-              <Button variant="glass" size="lg" className="h-12" disabled={index === 0} onClick={() => setIndex((i) => i - 1)}><ArrowLeft aria-hidden /> Back</Button>
-              {index < TOTAL - 1 ? (
-                <Button variant="aero" size="lg" className="h-12 px-8" disabled={!answers[q.id]} onClick={() => setIndex((i) => i + 1)}>Next <ArrowRight aria-hidden /></Button>
-              ) : (
-                <Button variant="aero" size="lg" className="h-12 px-8" disabled={submitting} onClick={finish}>{submitting ? "Saving…" : "Finish"} <Check aria-hidden /></Button>
-              )}
+            <div className="mt-8 flex justify-center">
+              <Button variant="aero" size="lg" className="h-12 px-10 text-base" disabled={submitting} onClick={finish}>{submitting ? "Saving…" : "Finish"} <Check aria-hidden /></Button>
             </div>
           </section>
         )}
