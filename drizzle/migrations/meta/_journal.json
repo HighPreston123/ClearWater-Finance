@@ -15,6 +15,13 @@
       "when": 1791695648239,
       "tag": "0001_fin_sequences_after_import",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791697098730,
+      "tag": "0002_mfa_restrictive_policies",
+      "breakpoints": true
     }
   ]
 }
