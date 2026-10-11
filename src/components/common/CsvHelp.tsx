@@ -47,9 +47,9 @@ export function CsvSettingsLink({ section, title, text }: { section: CsvSection;
       <Link
         to="/settings"
         hash={section}
-        className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:opacity-90"
+        className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:opacity-90"
       >
-        <FileUp className="h-4 w-4" aria-hidden /> Import CSV in Settings
+        <FileUp className="h-3.5 w-3.5" aria-hidden /> Import CSV
       </Link>
     </GlassCard>
   );
