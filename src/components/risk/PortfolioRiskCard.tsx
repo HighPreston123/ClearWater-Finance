@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { valueHolding } from "@/lib/investments/valuation";
@@ -36,6 +36,16 @@ export function PortfolioRiskCard() {
     } catch { setErr("Could not calculate portfolio risk."); }
     finally { setBusy(false); }
   };
+
+  // Auto-fetch price history once per visit so "Historical market data" is filled in.
+  const auto = useRef<string | null>(null);
+  const key = positions.map((p) => p.symbol).join(",");
+  useEffect(() => {
+    if (!key || auto.current === key) return;
+    auto.current = key;
+    void go();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   const top = res ? [...res.holdings].filter((h) => h.riskShare !== null).sort((a, b) => (b.riskShare ?? 0) - (a.riskShare ?? 0)).slice(0, 8) : [];
 
