@@ -37,11 +37,21 @@ function AuthPage() {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<Notice>(null);
 
-  // Already signed in? Go straight to the app.
+  // Already signed in? Go straight to the app. A password-recovery link that landed here
+  // is forwarded (with its code/token) to the reset page instead.
   useEffect(() => {
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    if (hash.get("type") === "recovery") {
+      window.location.replace(`/reset-password${window.location.search}${window.location.hash}`);
+      return;
+    }
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") navigate({ to: "/reset-password", hash: "type=recovery", replace: true });
+    });
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) navigate({ to: "/", replace: true });
     });
+    return () => sub.subscription.unsubscribe();
   }, [navigate]);
 
   const submit = async (e: React.FormEvent) => {

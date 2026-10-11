@@ -34,10 +34,51 @@ function ResetPasswordPage() {
   const [done, setDone] = useState(false);
   const [resent, setResent] = useState(false);
 
-  // Recovery links arrive with a hash like #access_token=...&type=recovery
+  // Recovery links arrive either as ?code=... (PKCE) or #access_token=...&type=recovery.
+  // The auth client exchanges them on load and fires PASSWORD_RECOVERY; we wait for that
+  // (or an established session from the link) before showing the form.
   useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
     const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    setLink(hash.get("type") === "recovery" ? "valid" : "invalid");
+    const hasLink = Boolean(query.get("code")) || hash.get("type") === "recovery" || Boolean(hash.get("access_token"));
+    if (query.get("error") || hash.get("error")) {
+      setLink("invalid");
+      return;
+    }
+    if (!hasLink) {
+      setLink("invalid");
+      return;
+    }
+    let settled = false;
+    const settle = (s: LinkState) => {
+      if (settled) return;
+      settled = true;
+      setLink(s);
+      // Strip the one-time code/token from the address bar.
+      window.history.replaceState(null, "", window.location.pathname);
+    };
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY" || (session && (event === "SIGNED_IN" || event === "INITIAL_SESSION"))) {
+        settle("valid");
+      }
+    });
+    (async () => {
+      const code = query.get("code");
+      const { data } = await supabase.auth.getSession();
+      if (data.session) return settle("valid");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (!error) return settle("valid");
+        const again = await supabase.auth.getSession();
+        if (again.data.session) return settle("valid");
+      }
+      // Give the client a moment to finish processing a hash link.
+      setTimeout(async () => {
+        const { data: late } = await supabase.auth.getSession();
+        settle(late.session ? "valid" : "invalid");
+      }, 1500);
+    })();
+    return () => sub.subscription.unsubscribe();
   }, []);
 
   const submit = async (e: React.FormEvent) => {
