@@ -42,8 +42,8 @@ export const loadUserState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ data: PersistedState } | null> => {
     await assertMfa(context);
-    const { withOwner, readState } = await import("./tiger.server");
-    const data = await withOwner(context.userId, (tx) => readState(tx, context.userId));
+    const { readOwnerState } = await import("./tiger.server");
+    const data = await readOwnerState(context.userId);
     return data ? { data: JSON.parse(JSON.stringify(data)) } : null;
   });
 

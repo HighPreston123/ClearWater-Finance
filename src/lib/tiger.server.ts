@@ -36,8 +36,8 @@ export async function withOwner<T>(ownerId: string, fn: (tx: Tx) => Promise<T>):
   });
   try {
     return (await sql.begin(async (tx) => {
-      await tx`SET LOCAL ROLE fin_app`;
-      await tx`SELECT set_config('app.user_id', ${ownerId}, true)`;
+      // One round trip: set_config('role', …, true) is SET LOCAL ROLE.
+      await tx`SELECT set_config('role', 'fin_app', true), set_config('app.user_id', ${ownerId}, true)`;
       return fn(tx);
     })) as T;
   } catch (e) {
@@ -52,13 +52,58 @@ export async function withOwner<T>(ownerId: string, fn: (tx: Tx) => Promise<T>):
 
 const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 
+/**
+ * All owner state in ONE statement (one snapshot): settings + accounts + holdings + transactions + overrides
+ * as JSON columns. Numerics are cast to text so values match the row-by-row driver output exactly.
+ * `owner` must be a validated UUID (it is inlined for the single-round-trip simple-protocol path).
+ */
+const stateSql = (o: string) => `SELECT
+  (SELECT to_jsonb(s) FROM (SELECT risk_inputs, savings_settings, date_range, transaction_source FROM fin.user_settings WHERE user_id = '${o}') s) AS settings,
+  COALESCE((SELECT jsonb_agg(to_jsonb(a) ORDER BY a.created_at, a.id) FROM fin.financial_accounts a WHERE a.user_id = '${o}'), '[]') AS accts,
+  COALESCE((SELECT jsonb_agg(to_jsonb(h) || jsonb_build_object('quantity', h.quantity::text, 'latest_price', h.latest_price::text) ORDER BY h.id)
+    FROM fin.investment_holdings h WHERE h.user_id = '${o}'), '[]') AS holds,
+  COALESCE((SELECT jsonb_agg(to_jsonb(t) || jsonb_build_object('d', to_char(t.txn_date, 'YYYY-MM-DD')) ORDER BY t.txn_date, t.id)
+    FROM fin.transactions t WHERE t.user_id = '${o}'), '[]') AS txns,
+  COALESCE((SELECT jsonb_agg(jsonb_build_object('series_key', r.series_key, 'detection', r.detection, 'review', r.review))
+    FROM fin.recurring_overrides r WHERE r.user_id = '${o}'), '[]') AS ovr`;
+
 export async function readState(tx: Tx, owner: string): Promise<PersistedState | null> {
-  const [settings] = await tx<any[]>`SELECT risk_inputs, savings_settings, date_range, transaction_source FROM fin.user_settings WHERE user_id = ${owner}`;
+  if (!UUID.test(owner)) throw new Error("Unauthorized: invalid owner");
+  const [row] = await tx.unsafe(stateSql(owner));
+  return mapState(row);
+}
+
+/**
+ * Sign-in load in a single network round trip: BEGIN (read only, consistent snapshot), least-privilege role,
+ * owner context for RLS, the combined read, COMMIT — sent together over the simple query protocol.
+ * Same ownership guarantees as withOwner; the owner id is a validated UUID from the verified session.
+ */
+export async function readOwnerState(ownerId: string): Promise<PersistedState | null> {
+  if (!UUID.test(ownerId)) throw new Error("Unauthorized: invalid owner");
+  const url = process.env["TIGER_DATABASE_URL"];
+  if (!url) throw new DatabaseNotConfiguredError();
+  const sql = postgres(url, { ssl: "require", max: 1, prepare: false, fetch_types: false, connect_timeout: 10, idle_timeout: 5, onnotice: () => {} });
+  try {
+    const results = (await sql.unsafe(
+      `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL ROLE fin_app; SELECT set_config('app.user_id', '${ownerId}', true); ${stateSql(ownerId)}; COMMIT;`,
+    ).simple()) as unknown as any[][];
+    return mapState(results[3]?.[0]);
+  } catch (e) {
+    const err = e as { code?: string; message?: string };
+    console.error("[tiger] query failed", err.code ?? "", String(err.message ?? "").replace(/postgres(ql)?:\/\/\S+/g, "[redacted]"));
+    throw new Error("Database request failed");
+  } finally {
+    await sql.end({ timeout: 2 });
+  }
+}
+
+function mapState(row: any): PersistedState | null {
+  const settings = row?.settings;
   if (!settings) return null;
-  const accts = await tx<any[]>`SELECT * FROM fin.financial_accounts WHERE user_id = ${owner} ORDER BY created_at, id`;
-  const holds = await tx<any[]>`SELECT * FROM fin.investment_holdings WHERE user_id = ${owner} ORDER BY id`;
-  const txns = await tx<any[]>`SELECT *, to_char(txn_date,'YYYY-MM-DD') AS d FROM fin.transactions WHERE user_id = ${owner} ORDER BY txn_date, id`;
-  const ovr = await tx<any[]>`SELECT series_key, detection, review FROM fin.recurring_overrides WHERE user_id = ${owner}`;
+  const accts: any[] = row.accts ?? [];
+  const holds: any[] = row.holds ?? [];
+  const txns: any[] = row.txns ?? [];
+  const ovr: any[] = row.ovr ?? [];
 
   const accounts: InvestmentAccount[] = accts.map((a) => ({
     id: a.id, name: a.name, type: a.account_type, institution: a.institution ?? undefined, currency: "USD",
