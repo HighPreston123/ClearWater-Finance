@@ -1,11 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download } from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { CsvSettingsLink } from "@/components/common/CsvHelp";
+import { CsvSettingsLink, CsvMiniLink } from "@/components/common/CsvHelp";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { usePortfolio } from "@/store/useDerived";
 import { PageHeader, GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
-import { Button } from "@/components/ui/button";
 import { AllocationChart } from "@/components/investments/AllocationChart";
 import { MarketDataCard } from "@/components/investments/MarketDataCard";
 import { AccountCard } from "@/components/investments/AccountCard";
