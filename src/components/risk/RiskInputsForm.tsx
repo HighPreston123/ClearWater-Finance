@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Download, Plus, Trash2, Upload } from "lucide-react";
 import { parseRiskInputsCsv, RISK_INPUTS_TEMPLATE } from "@/lib/csv/riskInputsImport";
 import { GlassCard, CardTitle, Note } from "@/components/common/Glass";
+import { CsvGuide } from "@/components/common/CsvHelp";
 import { MoneyInput } from "@/components/common/MoneyInput";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -63,9 +64,28 @@ export function RiskInputsForm() {
     ["Risk comfort", manual.riskComfort],
   ];
   return (
-    <GlassCard>
-      <CardTitle>Your inputs (CSV file)</CardTitle>
+    <GlassCard id="csv-risk-inputs" className="scroll-mt-24">
+      <CardTitle>Import Future risk inputs from CSV</CardTitle>
       <p className="mb-4 text-sm text-muted-foreground">Upload one CSV with your emergency fund, cash reserves, debts, upcoming obligations, goals, time horizon and risk comfort. Blank cells stay "Unknown" — they are never treated as zero. Each upload replaces the previous inputs.</p>
+      <CsvGuide
+        columns={[
+          { name: "type", required: true, what: "Which input the row is: emergency_fund, emergency_target, cash_reserve, debt, no_debt, obligation, goal, time_horizon or risk_comfort.", example: "debt" },
+          { name: "name", what: "A label (e.g. the card or goal name). For risk_comfort: conservative, moderate or growth.", example: "Credit card" },
+          { name: "amount", what: "Dollars: fund balance, target, reserve, debt balance, bill or goal amount. For time_horizon: years until you need the money.", example: "3200" },
+          { name: "rate", what: "Debt rows only: interest rate (APR) in percent.", example: "19.9" },
+          { name: "min_payment", what: "Debt rows only: required monthly minimum payment in dollars.", example: "90" },
+          { name: "date", what: "Obligation and goal rows: due date or target date.", example: "2029-06-01" },
+          { name: "linked", what: "Cash reserve rows: emergency_fund (or an account id) if this cash is already counted elsewhere, to avoid double counting.", example: "emergency_fund" },
+        ]}
+        whereToFind={[
+          "Emergency fund and cash reserves: current balance of your savings or checking accounts (bank app or latest statement).",
+          "Debts: credit-card, loan or student-loan statements list the balance, APR and minimum payment.",
+          "Obligations: known upcoming bills — tax payments, insurance renewals, tuition, planned repairs.",
+          "Goals: your own targets (house down payment, car, wedding) with the amount and a target date.",
+          "Time horizon and risk comfort: your own judgement — years until retirement, and how much market ups and downs you can tolerate.",
+          "No debts? Add a single row with type no_debt so it counts as confirmed rather than unknown.",
+        ]}
+      />
       <div className="flex flex-wrap gap-3">
         <input ref={inputRef} type="file" accept=".csv,text/csv" className="hidden" id="risk-inputs-csv" onChange={(e) => { const f = e.target.files?.[0]; if (f) void read(f); }} />
         <Button variant="aero" onClick={() => inputRef.current?.click()}><Upload /> Upload CSV</Button>

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { parseTransactionsCsv, type CsvImportOptions } from "@/lib/csv/csvImport";
 import { formatCents, formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { CsvGuide } from "@/components/common/CsvHelp";
 import type { Transaction } from "@/types/finance";
 
 const REQUIRED_HEADERS = "Date, Merchant (or Description), Amount. Optional: Description, Type, Category.";
@@ -52,11 +53,26 @@ export function CsvImportCard() {
   const issues = ok ? ok.rows.filter((r) => r.issue) : [];
 
   return (
-    <GlassCard>
+    <GlassCard id="csv-transactions" className="scroll-mt-24">
       <CardTitle>Import transactions from CSV</CardTitle>
       <p className="text-sm text-muted-foreground">
         Bring your own bank export. The file's data replaces the current transaction set (undoable). Expected headers: {REQUIRED_HEADERS}
       </p>
+      <CsvGuide
+        columns={[
+          { name: "Date", required: true, what: "The day the purchase or deposit posted.", example: "2026-09-14" },
+          { name: "Merchant", required: true, what: "Who you paid or who paid you. A Description column works instead.", example: "Trader Joe's" },
+          { name: "Amount", required: true, what: "Dollar amount. Choose below whether positive numbers mean money in or money out.", example: "-54.20" },
+          { name: "Description", what: "Extra memo text from your bank.", example: "Groceries" },
+          { name: "Type", what: "income, expense or transfer. Left blank, it is worked out from the amount's sign.", example: "expense" },
+          { name: "Category", what: "Spending category. Left blank, it is guessed from the merchant.", example: "Groceries" },
+        ]}
+        whereToFind={[
+          "Your bank or credit-card website: open the account, find Statements or Activity, and choose Download / Export as CSV.",
+          "Pick a date range (the last 3–12 months works best). Export each account separately if needed.",
+          "Budgeting apps (Mint exports, YNAB, Monarch) also offer a CSV export with these columns.",
+        ]}
+      />
 
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

@@ -8,6 +8,7 @@ import { parseHoldingsCsv } from "@/lib/csv/holdingsImport";
 import { formatCents } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
+import { CsvGuide } from "@/components/common/CsvHelp";
 const REQUIRED_HEADERS = "Symbol (or Name), Quantity, and Price or Value. Optional: Account, Asset class, Cost basis, Date.";
 
 export function HoldingsImportCard() {
@@ -43,11 +44,28 @@ export function HoldingsImportCard() {
   const issues = ok ? ok.rows.filter((r) => r.issue) : [];
 
   return (
-    <GlassCard>
+    <GlassCard id="csv-holdings" className="scroll-mt-24">
       <CardTitle>Import investments from CSV</CardTitle>
       <p className="text-sm text-muted-foreground">
         Bring your own brokerage export. This replaces your current investment accounts and holdings — it never touches your bank transactions. Expected headers: {REQUIRED_HEADERS}
       </p>
+      <CsvGuide
+        columns={[
+          { name: "Symbol", required: true, what: "Ticker of the stock or fund. A Name column works instead.", example: "VTI" },
+          { name: "Quantity", required: true, what: "Number of shares or units you own.", example: "12.5" },
+          { name: "Price", required: true, what: "Price per share on the statement date. Or give Value (total worth) instead.", example: "245.10" },
+          { name: "Value", what: "Total market value of the position, if no price is given.", example: "3063.75" },
+          { name: "Account", what: "Which account it sits in, so holdings are grouped.", example: "Roth IRA" },
+          { name: "Asset class", what: "stock, bond, cash, fund, etc.", example: "stock" },
+          { name: "Cost basis", what: "What you originally paid in total.", example: "2500" },
+          { name: "Date", what: "Date the price or value is from.", example: "2026-09-30" },
+        ]}
+        whereToFind={[
+          "Your brokerage website (Fidelity, Schwab, Vanguard, Robinhood…): open Positions or Holdings and choose Download / Export CSV.",
+          "401(k) or IRA providers usually have the same export under Portfolio or Balances.",
+          "If there's no export, copy your positions from a statement into the template columns.",
+        ]}
+      />
 
       <div
         onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
