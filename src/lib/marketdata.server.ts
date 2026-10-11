@@ -76,9 +76,11 @@ export async function syncDailyBars(tx: Tx, symbol: string, days: number) {
         timeframe: "1Day", start: from.toISOString(), feed: FEED, adjustment: "raw", limit: "1000",
         ...(pageToken ? { page_token: pageToken } : {}),
       });
-      for (const b of body?.bars ?? []) {
-        const r = await tx`INSERT INTO fin.market_bars (symbol, ts, timeframe, feed, open, high, low, close, volume)
-          VALUES (${symbol}, ${b.t}, '1Day', ${FEED}, ${b.o}, ${b.h}, ${b.l}, ${b.c}, ${b.v})
+      const bars: any[] = body?.bars ?? [];
+      // Bounded batches (≤500 rows, 9 params each) instead of one round-trip per bar; same key + dedupe.
+      for (let i = 0; i < bars.length; i += 500) {
+        const rows = bars.slice(i, i + 500).map((b) => ({ symbol, ts: b.t, timeframe: "1Day", feed: FEED, open: b.o, high: b.h, low: b.l, close: b.c, volume: b.v }));
+        const r = await tx`INSERT INTO fin.market_bars ${tx(rows, "symbol", "ts", "timeframe", "feed", "open", "high", "low", "close", "volume")}
           ON CONFLICT (symbol, timeframe, feed, ts) DO NOTHING`;
         inserted += r.count;
       }

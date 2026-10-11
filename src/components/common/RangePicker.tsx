@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { CalendarRange } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useFinanceStore, defaultRange } from "@/store/FinanceStore";
@@ -8,9 +9,10 @@ import { Input } from "@/components/ui/input";
 /** Shared date range used by all transaction-based metrics and filters. */
 export function RangePicker() {
   const { transactions, range, setRange } = useFinanceStore();
-  const b = datasetBounds(transactions);
-  const months = b ? monthsBetween(b) : [];
-  const complete = new Set(datasetCompleteMonths(transactions));
+  const { b, months, complete } = useMemo(() => {
+    const b = datasetBounds(transactions);
+    return { b, months: b ? monthsBetween(b) : [], complete: new Set(datasetCompleteMonths(transactions)) };
+  }, [transactions]);
   const currentKey = months.find((m) => { const r = monthRange(m); return r.start === range.start && r.end === range.end; })
     ?? (b && range.start === b.start && range.end === b.end ? "all" : "custom");
   return (
