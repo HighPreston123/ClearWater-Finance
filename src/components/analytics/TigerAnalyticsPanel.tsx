@@ -95,7 +95,7 @@ function Body({ d }: { d: AnalyticsResult }) {
     <>
       <div className="flex flex-wrap gap-2">
         {d.includesSample && <StatusBadge tone="pending">Includes sample/demo data</StatusBadge>}
-        <StatusBadge tone="info">{d.source === "continuous_aggregate" ? "TimescaleDB daily aggregate" : "Direct SQL (aggregate unavailable)"}</StatusBadge>
+        <StatusBadge tone="info">Daily summary</StatusBadge>
         {d.reconciled === true && <StatusBadge tone="ok">Matches source transactions</StatusBadge>}
         {d.reconciled === false && <StatusBadge tone="warn">Summary out of date — press Refresh analysis</StatusBadge>}
         {d.excludedCurrencies.length > 0 && <StatusBadge tone="warn">Excluded non-USD: {d.excludedCurrencies.join(", ")}</StatusBadge>}
