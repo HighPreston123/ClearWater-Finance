@@ -6,7 +6,7 @@ export const FEATURES = {
   nessieTransactions: false,
   holdingsImport: false,
   marketData: false,
-  aiInsights: false,
+  aiInsights: true,
   audioSummary: false,
   advisorMatching: false,
   nessieAdvisors: false,

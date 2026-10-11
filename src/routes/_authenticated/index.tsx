@@ -16,6 +16,7 @@ import { AudioSummaryControls } from "@/components/integrations/AudioSummaryCont
 import { RecommendedAdvisor } from "@/components/advisors/RecommendedAdvisor";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { formatCents, formatMicros, formatPct } from "@/lib/format";
+import { buildInsightPayload } from "@/lib/insights/payload";
 import { buildAudioSummaryText } from "@/lib/finance/audioSummaryText";
 
 export const Route = createFileRoute("/_authenticated/")({
@@ -41,6 +42,12 @@ function Overview() {
     recurringCount: d.activeRecurring.length, recurringMonthlyCents: d.recurringMonthly,
     investmentsTotal: accounts.length ? formatMicros(d.portfolio.totalMicros) : null,
     investmentsPartial: d.portfolio.partial, recommendation: d.recommendation,
+  });
+
+  const insightPayload = buildInsightPayload({
+    periodLabel: d.label, summary: s, recurringCount: d.activeRecurring.length, recurringMonthlyCents: d.recurringMonthly,
+    investmentsCents: accounts.length ? Math.round(Number(d.portfolio.totalMicros) / 10000) : null,
+    investmentsPartial: d.portfolio.partial, score: d.score as never, wellness: d.wellness as never, recommendation: d.recommendation,
   });
 
   return (
@@ -110,7 +117,7 @@ function Overview() {
       <TigerAnalyticsPanel />
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <AIInsightsPanel />
+        <AIInsightsPanel key={d.label + String(s.income) + String(s.spending)} payload={insightPayload} />
         <RecommendedAdvisor compact />
       </div>
     </div>
