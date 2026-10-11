@@ -97,41 +97,73 @@ export async function readState(tx: Tx, owner: string): Promise<PersistedState |
  * so triggers mark exactly the affected days for analytics refresh and provenance columns survive.
  * All rows are stamped with the verified owner id.
  */
-export async function writeState(tx: Tx, owner: string, s: PersistedState): Promise<void> {
+/** Settings are always sent; data sections are omitted by the client when unchanged since the last successful save. */
+export type StatePatch = Omit<PersistedState, "transactions" | "recurringOverrides" | "accounts" | "holdings"> &
+  Partial<Pick<PersistedState, "transactions" | "recurringOverrides" | "accounts" | "holdings">>;
+
+export async function writeState(tx: Tx, owner: string, s: StatePatch): Promise<{ transactionsChanged: boolean }> {
   await tx`INSERT INTO fin.user_settings (user_id, risk_inputs, savings_settings, date_range, transaction_source, updated_at)
     VALUES (${owner}, ${tx.json(s.manual as never)}, ${tx.json(s.savings as never)}, ${s.range ? tx.json(s.range as never) : null}, ${s.transactionSource}, now())
     ON CONFLICT (user_id) DO UPDATE SET risk_inputs = EXCLUDED.risk_inputs, savings_settings = EXCLUDED.savings_settings,
       date_range = EXCLUDED.date_range, transaction_source = EXCLUDED.transaction_source, updated_at = now()`;
 
-  await tx`DELETE FROM fin.recurring_overrides WHERE user_id = ${owner}`;
-  await tx`DELETE FROM fin.financial_accounts WHERE user_id = ${owner}`; // cascades to this owner's holdings
+  // --- Accounts + holdings (sent together): remove missing ids, upsert the rest — no wholesale delete/reinsert ---
+  if (s.accounts && s.holdings) {
+    const acctIds = s.accounts.map((a) => a.id);
+    const holdIds = s.holdings.map((h) => h.id);
+    await tx`DELETE FROM fin.investment_holdings WHERE user_id = ${owner} AND NOT (id = ANY(${holdIds}::text[]))`;
+    await tx`DELETE FROM fin.financial_accounts WHERE user_id = ${owner} AND NOT (id = ANY(${acctIds}::text[]))`;
+    if (s.accounts.length) {
+      await tx`INSERT INTO fin.financial_accounts ${tx(s.accounts.map((a) => ({
+        user_id: owner, id: a.id, name: a.name, account_type: a.type, institution: a.institution ?? null,
+        currency: a.currency, cash_cents: a.cashCents, valuation_timestamp: a.valuationTimestamp, source: a.source,
+      })))}
+        ON CONFLICT (user_id, id) DO UPDATE SET name = EXCLUDED.name, account_type = EXCLUDED.account_type,
+          institution = EXCLUDED.institution, currency = EXCLUDED.currency, cash_cents = EXCLUDED.cash_cents,
+          valuation_timestamp = EXCLUDED.valuation_timestamp, source = EXCLUDED.source`;
+    }
+    if (s.holdings.length) {
+      await tx`INSERT INTO fin.investment_holdings ${tx(s.holdings.map((h) => ({
+        user_id: owner, id: h.id, account_id: h.accountId, symbol: h.symbol, external_security_id: h.externalSecurityId ?? null,
+        name: h.name, asset_class: h.assetClass, quantity: h.quantity, latest_price: h.latestPrice, price_timestamp: h.priceTimestamp,
+        supplied_value_cents: h.suppliedValueCents ?? null, supplied_value_date: h.suppliedValueDate ?? null,
+        cost_basis_cents: h.costBasisCents ?? null, sector: h.sector ?? null, underlying_exposure: h.underlyingExposure ?? null, source: h.source,
+      })))}
+        ON CONFLICT (user_id, id) DO UPDATE SET account_id = EXCLUDED.account_id, symbol = EXCLUDED.symbol,
+          external_security_id = EXCLUDED.external_security_id, name = EXCLUDED.name, asset_class = EXCLUDED.asset_class,
+          quantity = EXCLUDED.quantity, latest_price = EXCLUDED.latest_price, price_timestamp = EXCLUDED.price_timestamp,
+          supplied_value_cents = EXCLUDED.supplied_value_cents, supplied_value_date = EXCLUDED.supplied_value_date,
+          cost_basis_cents = EXCLUDED.cost_basis_cents, sector = EXCLUDED.sector,
+          underlying_exposure = EXCLUDED.underlying_exposure, source = EXCLUDED.source`;
+    }
+  }
 
-  if (s.accounts.length) {
-    await tx`INSERT INTO fin.financial_accounts ${tx(s.accounts.map((a) => ({
-      user_id: owner, id: a.id, name: a.name, account_type: a.type, institution: a.institution ?? null,
-      currency: a.currency, cash_cents: a.cashCents, valuation_timestamp: a.valuationTimestamp, source: a.source,
-    })))}`;
+  // --- Recurring overrides: remove missing keys, upsert the rest ---
+  if (s.recurringOverrides) {
+    const ovr = Object.entries(s.recurringOverrides);
+    await tx`DELETE FROM fin.recurring_overrides WHERE user_id = ${owner} AND NOT (series_key = ANY(${ovr.map(([k]) => k)}::text[]))`;
+    if (ovr.length) {
+      await tx`INSERT INTO fin.recurring_overrides ${tx(ovr.map(([k, o]) => ({
+        user_id: owner, series_key: k, detection: o.detection ?? null, review: o.review ?? null,
+      })))}
+        ON CONFLICT (user_id, series_key) DO UPDATE SET detection = EXCLUDED.detection, review = EXCLUDED.review`;
+    }
   }
-  if (s.holdings.length) {
-    await tx`INSERT INTO fin.investment_holdings ${tx(s.holdings.map((h) => ({
-      user_id: owner, id: h.id, account_id: h.accountId, symbol: h.symbol, external_security_id: h.externalSecurityId ?? null,
-      name: h.name, asset_class: h.assetClass, quantity: h.quantity, latest_price: h.latestPrice, price_timestamp: h.priceTimestamp,
-      supplied_value_cents: h.suppliedValueCents ?? null, supplied_value_date: h.suppliedValueDate ?? null,
-      cost_basis_cents: h.costBasisCents ?? null, sector: h.sector ?? null, underlying_exposure: h.underlyingExposure ?? null, source: h.source,
-    })))}`;
-  }
+
+  if (!s.transactions) return { transactionsChanged: false };
+  const transactions = s.transactions;
 
   // --- Transactions: diff against what is stored ---
   const existing = await tx<any[]>`SELECT id, to_char(txn_date,'YYYY-MM-DD') AS d, merchant, amount_cents, txn_type, category,
     category_source, description, account_id, linked_account_id FROM fin.transactions WHERE user_id = ${owner}`;
   const byId = new Map(existing.map((r) => [r.id as string, r]));
-  const incomingIds = new Set(s.transactions.map((t) => t.id));
+  const incomingIds = new Set(transactions.map((t) => t.id));
   const removed = existing.filter((r) => !incomingIds.has(r.id)).map((r) => r.id as string);
   for (let i = 0; i < removed.length; i += 1000) {
     await tx`DELETE FROM fin.transactions WHERE user_id = ${owner} AND id = ANY(${removed.slice(i, i + 1000)}::text[])`;
   }
   const newSource = s.transactionSource;
-  const changed = s.transactions.filter((t) => {
+  const changed = transactions.filter((t) => {
     const r = byId.get(t.id);
     return !r || r.d !== t.date || r.merchant !== t.merchant || Number(r.amount_cents) !== t.amount || r.txn_type !== t.type ||
       r.category !== t.category || r.category_source !== t.categorySource || r.description !== (t.description ?? "") ||
@@ -151,18 +183,16 @@ export async function writeState(tx: Tx, owner: string, s: PersistedState): Prom
         category_source = EXCLUDED.category_source, description = EXCLUDED.description, account_id = EXCLUDED.account_id,
         linked_account_id = EXCLUDED.linked_account_id, updated_at = now()`;
   }
-  // Category overrides mirror manual categorizations.
-  await tx`DELETE FROM fin.transaction_category_overrides WHERE user_id = ${owner}`;
-  const manual = s.transactions.filter((t) => t.categorySource === "manual");
-  for (let i = 0; i < manual.length; i += 1000) {
-    await tx`INSERT INTO fin.transaction_category_overrides ${tx(manual.slice(i, i + 1000).map((t) => ({ user_id: owner, txn_id: t.id, category: t.category })))}`;
+  const transactionsChanged = removed.length > 0 || changed.length > 0;
+  if (transactionsChanged) {
+    // Category overrides mirror manual categorizations.
+    await tx`DELETE FROM fin.transaction_category_overrides WHERE user_id = ${owner}`;
+    const manual = transactions.filter((t) => t.categorySource === "manual");
+    for (let i = 0; i < manual.length; i += 1000) {
+      await tx`INSERT INTO fin.transaction_category_overrides ${tx(manual.slice(i, i + 1000).map((t) => ({ user_id: owner, txn_id: t.id, category: t.category })))}`;
+    }
   }
-  const ovr = Object.entries(s.recurringOverrides);
-  if (ovr.length) {
-    await tx`INSERT INTO fin.recurring_overrides ${tx(ovr.map(([k, o]) => ({
-      user_id: owner, series_key: k, detection: o.detection ?? null, review: o.review ?? null,
-    })))}`;
-  }
+  return { transactionsChanged };
 }
 
 /**
