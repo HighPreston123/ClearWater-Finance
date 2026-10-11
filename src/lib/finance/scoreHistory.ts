@@ -4,7 +4,7 @@ import { datasetCompleteMonths, monthEnd, monthRange, monthStart } from "./dates
 import { summaryForMonth } from "./metrics";
 
 /** Bump when computeHistoricalScore's rubric changes; only same-version assessments are compared. */
-export const SCORE_METHODOLOGY_VERSION = "historical-cash-flow-v1";
+export const SCORE_METHODOLOGY_VERSION = "historical-cash-flow-v2";
 export const SCORE_TYPE = "historical_cash_flow";
 export const RECONSTRUCTED_LABEL = "Reconstructed from historical transactions.";
 

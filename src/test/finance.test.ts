@@ -20,7 +20,7 @@ describe("finance", () => {
   });
   it("limited history normalizes", () => {
     const r = computeHistoricalScore(SAMPLE_TRANSACTIONS, { start: "2026-07-01", end: "2026-07-31" });
-    expect(r.status === "ok" && r.limitedHistory && r.score).toBe(1000);
+    expect(r.status === "ok" && r.limitedHistory && r.score).toBe(100);
   });
   it("detects weekly + variable monthly", () => {
     const s = detectRecurring(SAMPLE_TRANSACTIONS, {});
