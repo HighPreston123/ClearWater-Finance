@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Transaction } from "@/types/finance";
-import { withOwner, ownerSnapshot, refreshOwnerAnalytics } from "./tiger.server";
+import { check, type Db } from "./db.server";
 import { compareCategories, lastTwoComplete, toPeriods, whatChanged, type BucketRow, type CategoryComparison, type TrendPeriod } from "./finance/trends";
 import { assessAllMonths, isReconstructed, SCORE_METHODOLOGY_VERSION, SCORE_TYPE } from "./finance/scoreHistory";
 import type { ScoreFactor } from "./finance/score";
 
-/** Server-only analytics over TigerData. Every function takes the VERIFIED owner id. */
+/** Server-only analytics. Every function takes the caller's client (RLS scopes all rows to the verified owner). */
 
 export interface ScoreRevision {
   id: string;
@@ -28,8 +28,8 @@ export interface AnalyticsResult {
   includesSample: boolean;
   /** Non-USD currencies are not combined with USD (no conversion method defined). */
   excludedCurrencies: string[];
-  source: "continuous_aggregate" | "direct_sql";
-  /** Continuous-aggregate totals equal a direct aggregation of fin.transactions. */
+  source: "daily_summary";
+  /** Daily-summary totals equal a direct aggregation of the transactions table. */
   reconciled: boolean | null;
   months: TrendPeriod[];
   weeks: TrendPeriod[];
@@ -43,74 +43,33 @@ export interface AnalyticsResult {
 const rowsToBuckets = (rows: any[]): BucketRow[] =>
   rows.map((r) => ({ bucket: r.b, income: Number(r.income ?? 0), spending: Number(r.spending ?? 0), transfers: Number(r.transfers ?? 0), txnCount: Number(r.n ?? 0) }));
 
-const BUCKET_COLS = (dateCol: string, width: string, n: string) => `to_char(time_bucket(INTERVAL '${width}', ${dateCol}),'YYYY-MM-DD') AS b,
-    sum(amount_cents) FILTER (WHERE txn_type = 'income') AS income, sum(amount_cents) FILTER (WHERE txn_type = 'expense') AS spending,
-    sum(amount_cents) FILTER (WHERE txn_type = 'transfer') AS transfers, ${n} AS n`;
-const rowsJson = (inner: string) => `COALESCE((SELECT jsonb_agg(to_jsonb(q) ORDER BY q.b) FROM (${inner}) q), '[]')`;
-
-export async function getAnalytics(owner: string): Promise<AnalyticsResult> {
-  // Values below are inlined as validated literals: a parameterized statement costs an extra describe round trip
-  // with prepare: false (pooler mode). owner is a UUID from the verified session; dates come from the DB and are checked.
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(owner)) throw new Error("Unauthorized: invalid owner");
+export async function getAnalytics(db: Db): Promise<AnalyticsResult> {
   if (!/^[a-z_]+$/.test(SCORE_TYPE)) throw new Error("bad score type");
   const D = /^\d{4}-\d{2}-\d{2}$/;
-  const own = `user_id = '${owner}'`;
-  // Statement A: bounds, score history, and the direct monthly aggregation of the authoritative table.
-  const headSql = `SELECT
-      (SELECT to_jsonb(x) FROM (SELECT to_char(min(txn_date),'YYYY-MM-DD') AS s, to_char(max(txn_date),'YYYY-MM-DD') AS e,
-        bool_or(is_sample) AS sample, array_remove(array_agg(DISTINCT CASE WHEN currency <> 'USD' THEN currency END), NULL) AS other,
-        max(updated_at) AS upd FROM fin.transactions WHERE ${own}) x) AS b,
-      COALESCE((SELECT jsonb_agg(jsonb_build_object('id', id::text, 'ps', to_char(period_start,'YYYY-MM-DD'), 'pe', to_char(period_end,'YYYY-MM-DD'),
-        'score', score, 'status', status, 'factors', factors, 'metrics', metrics, 'methodology_version', methodology_version,
-        'input_fingerprint', input_fingerprint, 'reconstructed', reconstructed, 'calculated_at', calculated_at, 'last_confirmed_at', last_confirmed_at)
-        ORDER BY period_start, last_confirmed_at)
-        FROM fin.wellness_score_history WHERE ${own} AND score_type = '${SCORE_TYPE}'), '[]') AS history,
-      ${rowsJson(`SELECT ${BUCKET_COLS("txn_date", "1 month", "count(*)")} FROM fin.transactions WHERE ${own} AND currency = 'USD' GROUP BY 1`)} AS direct`;
-  // Statement B: the owner-scoped continuous aggregate over the data's own bounds, read once and bucketed three ways.
-  const aggSql = `WITH d AS MATERIALIZED (
-      SELECT * FROM fin.owner_daily_activity(
-        (SELECT min(txn_date) FROM fin.transactions WHERE ${own}), (SELECT max(txn_date) FROM fin.transactions WHERE ${own}))
-      WHERE currency = 'USD')
-    SELECT ${rowsJson(`SELECT ${BUCKET_COLS("day", "1 month", "sum(txn_count)")} FROM d GROUP BY 1`)} AS monthly,
-           ${rowsJson(`SELECT ${BUCKET_COLS("day", "1 week", "sum(txn_count)")} FROM d GROUP BY 1`)} AS weekly,
-           COALESCE((SELECT jsonb_agg(to_jsonb(q)) FROM (SELECT to_char(time_bucket(INTERVAL '1 month', day),'YYYY-MM-DD') AS b, category, sum(amount_cents) AS cents
-             FROM d WHERE txn_type = 'expense' GROUP BY 1, 2) q), '[]') AS cats`;
-  // Fallback when the aggregate is unavailable: the same buckets straight from the authoritative table.
-  const directSql = `SELECT
-      ${rowsJson(`SELECT ${BUCKET_COLS("txn_date", "1 week", "count(*)")} FROM fin.transactions WHERE ${own} AND currency = 'USD' GROUP BY 1`)} AS weekly,
-      COALESCE((SELECT jsonb_agg(to_jsonb(q)) FROM (SELECT to_char(time_bucket(INTERVAL '1 month', txn_date),'YYYY-MM-DD') AS b, category, sum(amount_cents) AS cents
-        FROM fin.transactions WHERE ${own} AND currency = 'USD' AND txn_type = 'expense' GROUP BY 1, 2) q), '[]') AS cats`;
-
-  let source: AnalyticsResult["source"] = "continuous_aggregate";
-  let head: any, agg: any;
-  try {
-    [head, agg] = await ownerSnapshot(owner, [headSql, aggSql]); // one round trip, one snapshot
-  } catch (e) {
-    console.error("[analytics] aggregate unavailable, using direct SQL", (e as Error).message);
-    source = "direct_sql";
-    [head, agg] = await ownerSnapshot(owner, [headSql, directSql]);
-  }
+  // One call, one snapshot: bounds, score history, direct monthly totals, and the daily-summary buckets (owner-scoped by RLS).
+  const head = check(await db.rpc("fin_analytics", { p_score_type: SCORE_TYPE }), "analytics") as any;
+  const source: AnalyticsResult["source"] = "daily_summary";
   {
     const b = head?.b ?? {};
     const history = mapScoreHistory(head?.history ?? []);
     const generatedAt = new Date().toISOString();
     if (!b?.s) {
-      return { empty: true, bounds: null, includesSample: false, excludedCurrencies: [], source: "continuous_aggregate", reconciled: null,
+      return { empty: true, bounds: null, includesSample: false, excludedCurrencies: [], source, reconciled: null,
         months: [], weeks: [], comparison: null, weekComparison: null, scoreHistory: { current: [], revisions: history.revisions }, dataUpdatedAt: null, generatedAt };
     }
     const bounds = { start: b.s as string, end: b.e as string };
     if (!D.test(bounds.start) || !D.test(bounds.end)) throw new Error("bad analytics bounds");
     // Periods no longer complete in the dataset (e.g. after removing data) drop out of the main timeline.
     history.current = history.current.filter((r) => r.periodStart >= bounds.start && r.periodEnd <= bounds.end);
-    const direct: any[] = head.direct;
-    const monthly: any[] = source === "direct_sql" ? direct : agg?.monthly ?? [];
-    const weekly: any[] = agg?.weekly ?? [];
-    const cats: any[] = agg?.cats ?? [];
+    const direct: any[] = head.direct ?? [];
+    const monthly: any[] = head.monthly ?? [];
+    const weekly: any[] = head.weekly ?? [];
+    const cats: any[] = head.cats ?? [];
 
     const months = toPeriods(rowsToBuckets(monthly), "month", bounds);
     const weeks = toPeriods(rowsToBuckets(weekly), "week", bounds);
     const key = (r: BucketRow) => `${r.bucket}|${r.income}|${r.spending}|${r.transfers}|${r.txnCount}`;
-    const reconciled = source === "continuous_aggregate" ? rowsToBuckets(direct).map(key).join() === rowsToBuckets(monthly).map(key).join() : null;
+    const reconciled = rowsToBuckets(direct).map(key).join() === rowsToBuckets(monthly).map(key).join();
 
     const pair = lastTwoComplete(months, "month");
     let comparison: AnalyticsResult["comparison"] = null;
@@ -146,31 +105,25 @@ async function sha256(s: string) {
 }
 
 /** Recalculates every complete month with the existing formula. Identical inputs never create a new row. */
-export async function recalculateScores(owner: string): Promise<{ assessed: number }> {
-  return withOwner(owner, async (tx) => {
-    const rows = await tx<any[]>`SELECT id, to_char(txn_date,'YYYY-MM-DD') AS d, merchant, amount_cents, txn_type, category, category_source,
-      description, account_id FROM fin.transactions WHERE user_id = ${owner} AND currency = 'USD'`;
-    const txns = rows.map((t) => ({ id: t.id, date: t.d, merchant: t.merchant, amount: Number(t.amount_cents), type: t.txn_type, category: t.category,
-      categorySource: t.category_source, description: t.description, accountId: t.account_id })) as Transaction[];
-    const now = new Date();
-    const assessments = assessAllMonths(txns);
-    for (const a of assessments) {
-      const fp = await sha256(a.fingerprintInput);
-      await tx`INSERT INTO fin.wellness_score_history (user_id, score_type, period_start, period_end, score, status, factors, metrics,
-          methodology_version, input_fingerprint, reconstructed)
-        VALUES (${owner}, ${SCORE_TYPE}, ${a.periodStart}, ${a.periodEnd}, ${a.score}, ${a.status}, ${tx.json(a.factors as never)},
-          ${tx.json(a.metrics as never)}, ${SCORE_METHODOLOGY_VERSION}, ${fp}, ${isReconstructed(a.periodEnd, now)})
-        ON CONFLICT (user_id, score_type, period_start, methodology_version, input_fingerprint)
-        DO UPDATE SET last_confirmed_at = now()`;
-    }
-    return { assessed: assessments.length };
-  });
+export async function recalculateScores(db: Db): Promise<{ assessed: number }> {
+  const rows = (check(await db.rpc("fin_score_inputs"), "score_inputs") as any[]) ?? [];
+  const txns = rows.map((t) => ({ id: t.id, date: t.d, merchant: t.merchant, amount: Number(t.amount_cents), type: t.txn_type, category: t.category,
+    categorySource: t.category_source, description: t.description, accountId: t.account_id })) as Transaction[];
+  const now = new Date();
+  const assessments = assessAllMonths(txns);
+  const payload = [];
+  for (const a of assessments) {
+    payload.push({ score_type: SCORE_TYPE, period_start: a.periodStart, period_end: a.periodEnd, score: a.score, status: a.status,
+      factors: a.factors, metrics: a.metrics, methodology_version: SCORE_METHODOLOGY_VERSION,
+      input_fingerprint: await sha256(a.fingerprintInput), reconstructed: isReconstructed(a.periodEnd, now) });
+  }
+  if (payload.length) check(await db.rpc("fin_record_scores", { p: payload as any }), "record_scores");
+  return { assessed: assessments.length };
 }
 
-/** After a successful save: refresh affected aggregate days, then rescore (later months depend on earlier ones). */
-export async function afterTransactionsChanged(owner: string, full = false) {
-  await refreshOwnerAnalytics(owner, full);
-  await recalculateScores(owner);
+/** After a successful save: rescore (later months depend on earlier ones). Summaries are computed live, so nothing to refresh. */
+export async function afterTransactionsChanged(db: Db) {
+  await recalculateScores(db);
 }
 
 // ---------------- Demonstration dataset (explicitly labeled, idempotent, separately resettable) ----------------
@@ -196,27 +149,24 @@ const DEMO_ROWS: [day: number, merchant: string, dollars: number, type: "income"
   [30, "Demo Music", 10, "expense", "Subscriptions"],
 ];
 
-export async function loadDemo(owner: string): Promise<{ inserted: number }> {
-  const inserted = await withOwner(owner, async (tx) => {
-    const [settings] = await tx<any[]>`SELECT 1 FROM fin.user_settings WHERE user_id = ${owner}`;
-    if (!settings) throw new Error("Open the app once so your account is set up before loading the demo.");
-    const rows = DEMO_ROWS.map(([day, merchant, dollars, type, category], i) => {
-      const id = `demo-${DEMO_MONTH}-${String(i + 1).padStart(2, "0")}`;
-      return {
-        user_id: owner, id, txn_date: `${DEMO_MONTH}-${String(day).padStart(2, "0")}`, merchant, amount_cents: dollars * 100, txn_type: type,
-        category, category_source: "rule", description: "Demonstration data — not personal", account_id: "acct-checking",
-        linked_account_id: type === "transfer" ? "acct-savings" : null, source: "demo", external_id: id, is_sample: true,
-      };
-    });
-    const res = await tx`INSERT INTO fin.transactions ${tx(rows)} ON CONFLICT DO NOTHING RETURNING id`;
-    return res.length;
+export async function loadDemo(db: Db, owner: string): Promise<{ inserted: number }> {
+  const settings = check(await db.from("fin_user_settings").select("user_id").eq("user_id", owner).maybeSingle(), "demo_settings");
+  if (!settings) throw new Error("Open the app once so your account is set up before loading the demo.");
+  const rows = DEMO_ROWS.map(([day, merchant, dollars, type, category], i) => {
+    const id = `demo-${DEMO_MONTH}-${String(i + 1).padStart(2, "0")}`;
+    return {
+      user_id: owner, id, txn_date: `${DEMO_MONTH}-${String(day).padStart(2, "0")}`, merchant, amount_cents: dollars * 100, txn_type: type,
+      category, category_source: "rule", description: "Demonstration data — not personal", account_id: "acct-checking",
+      linked_account_id: type === "transfer" ? "acct-savings" : null, source: "demo", external_id: id, is_sample: true,
+    };
   });
-  await afterTransactionsChanged(owner);
-  return { inserted };
+  const res = check(await db.from("fin_transactions").upsert(rows, { onConflict: "user_id,id", ignoreDuplicates: true }).select("id"), "demo_load") ?? [];
+  await afterTransactionsChanged(db);
+  return { inserted: res.length };
 }
 
-export async function resetDemo(owner: string): Promise<{ removed: number }> {
-  const removed = await withOwner(owner, async (tx) => (await tx`DELETE FROM fin.transactions WHERE user_id = ${owner} AND source = 'demo' RETURNING id`).length);
-  await afterTransactionsChanged(owner);
-  return { removed };
+export async function resetDemo(db: Db, owner: string): Promise<{ removed: number }> {
+  const res = check(await db.from("fin_transactions").delete().eq("user_id", owner).eq("source", "demo").select("id"), "demo_reset") ?? [];
+  await afterTransactionsChanged(db);
+  return { removed: res.length };
 }

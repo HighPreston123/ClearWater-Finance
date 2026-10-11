@@ -21,9 +21,9 @@ export const getWatchlist = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     await assertMfa(context);
-    const { withOwner } = await import("./tiger.server");
-    return withOwner(context.userId, async (tx) =>
-      (await tx<{ symbol: string }[]>`SELECT symbol FROM fin.watchlist WHERE user_id = ${context.userId} ORDER BY added_at`).map((r) => r.symbol));
+    const { check } = await import("./db.server");
+    const rows = check(await context.supabase.from("fin_watchlist").select("symbol").eq("user_id", context.userId).order("added_at"), "watchlist_read") ?? [];
+    return rows.map((r) => r.symbol);
   });
 
 export const setWatchSymbol = createServerFn({ method: "POST" })
@@ -31,14 +31,16 @@ export const setWatchSymbol = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ symbol: sym, add: z.boolean() }).parse(d))
   .handler(async ({ data, context }) => {
     await assertMfa(context);
-    const { withOwner } = await import("./tiger.server");
-    await withOwner(context.userId, async (tx) => {
-      if (data.add) {
-        const [row] = await tx<{ n: number }[]>`SELECT count(*)::int AS n FROM fin.watchlist WHERE user_id = ${context.userId}`;
-        if ((row?.n ?? 0) >= 25) throw new Error("Watchlist limit");
-        await tx`INSERT INTO fin.watchlist (user_id, symbol) VALUES (${context.userId}, ${data.symbol}) ON CONFLICT DO NOTHING`;
-      } else await tx`DELETE FROM fin.watchlist WHERE user_id = ${context.userId} AND symbol = ${data.symbol}`;
-    });
+    const { check } = await import("./db.server");
+    const db = context.supabase;
+    if (data.add) {
+      const { count, error } = await db.from("fin_watchlist").select("symbol", { count: "exact", head: true }).eq("user_id", context.userId);
+      check({ data: null, error }, "watchlist_count");
+      if ((count ?? 0) >= 25) throw new Error("Watchlist limit");
+      check(await db.from("fin_watchlist").upsert({ user_id: context.userId, symbol: data.symbol }, { onConflict: "user_id,symbol", ignoreDuplicates: true }), "watchlist_add");
+    } else {
+      check(await db.from("fin_watchlist").delete().eq("user_id", context.userId).eq("symbol", data.symbol), "watchlist_remove");
+    }
     return { ok: true };
   });
 
@@ -47,9 +49,8 @@ export const getLatestPrices = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ symbols: z.array(sym).min(1).max(50) }).parse(d))
   .handler(async ({ data, context }) => {
     await assertMfa(context);
-    const { withOwner } = await import("./tiger.server");
     const { getLatest } = await import("./marketdata.server");
-    return run(() => withOwnerRaw(withOwner, context.userId, (tx) => getLatest(tx, [...new Set(data.symbols)])));
+    return run(() => getLatest(context.supabase, [...new Set(data.symbols)]));
   });
 
 export const getDailyBars = createServerFn({ method: "POST" })
@@ -57,19 +58,6 @@ export const getDailyBars = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ symbol: sym, days: z.number().int().min(5).max(1825) }).parse(d))
   .handler(async ({ data, context }) => {
     await assertMfa(context);
-    const { withOwner } = await import("./tiger.server");
     const { syncDailyBars } = await import("./marketdata.server");
-    return run(() => withOwnerRaw(withOwner, context.userId, (tx) => syncDailyBars(tx, data.symbol, data.days)));
+    return run(() => syncDailyBars(context.supabase, data.symbol, data.days));
   });
-
-/** withOwner masks errors as "Database request failed"; keep Alpaca errors distinguishable. */
-async function withOwnerRaw<T>(withOwner: typeof import("./tiger.server").withOwner, owner: string, fn: Parameters<typeof withOwner<T>>[1]) {
-  let alpacaErr: unknown;
-  try {
-    return await withOwner(owner, async (tx) => {
-      try { return await fn(tx); } catch (e) { alpacaErr = e; throw e; }
-    });
-  } catch (e) {
-    throw alpacaErr ?? e;
-  }
-}

@@ -11,8 +11,8 @@ export const deleteMyAccount = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { userId } = context;
     await (await import("./mfa.server")).assertMfa(context);
-    const { deleteOwnerTigerData } = await import("./account.server");
-    await deleteOwnerTigerData(userId);
+    const { deleteOwnerFinancialData } = await import("./account.server");
+    await deleteOwnerFinancialData(context.supabase);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const s = await supabaseAdmin.from("user_state").delete().eq("user_id", userId);

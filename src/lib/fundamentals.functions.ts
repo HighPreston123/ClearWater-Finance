@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import type { FundamentalsResult } from "@/lib/edgar.server";
 
-/** SEC EDGAR fundamentals for the given holding symbols (cached 24h in TigerData). */
+/** SEC EDGAR fundamentals for the given holding symbols (cached 24h in the app database). */
 export const getFundamentals = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) =>
@@ -11,12 +11,11 @@ export const getFundamentals = createServerFn({ method: "POST" })
   .handler(async ({ data, context }): Promise<{ status: "ok"; results: FundamentalsResult[] }> => {
     const { assertMfa } = await import("./mfa.server");
     await assertMfa(context);
-    const { withOwner } = await import("./tiger.server");
     const { getCompanyFundamentals } = await import("./edgar.server");
     const symbols = [...new Set(data.symbols)];
     const results: FundamentalsResult[] = [];
     for (const s of symbols) {
-      results.push(await withOwner(context.userId, (tx) => getCompanyFundamentals(tx, s)));
+      results.push(await getCompanyFundamentals(context.supabase, s));
     }
     return { status: "ok", results };
   });

@@ -16,7 +16,7 @@ export interface FundamentalsResult {
   fetchedAt: string;
 }
 
-type Tx = { <T = any[]>(strings: TemplateStringsArray, ...values: any[]): Promise<T> & any; json(v: unknown): unknown };
+import { adminDb, check, type Db } from "./db.server";
 
 async function secJson(url: string): Promise<any> {
   const res = await fetch(url, { headers: { "User-Agent": UA, "Accept-Encoding": "identity" } });
@@ -38,9 +38,9 @@ function tickerMap(): Promise<Map<string, { cik: string; name: string }>> {
 }
 
 /** Returns cached fundamentals when fresh; otherwise fetches EDGAR companyfacts and caches them. */
-export async function getCompanyFundamentals(tx: Tx, symbol: string): Promise<FundamentalsResult> {
+export async function getCompanyFundamentals(db: Db, symbol: string): Promise<FundamentalsResult> {
   const sym = symbol.toUpperCase();
-  const [cached] = await tx<any[]>`SELECT metrics, status, fetched_at FROM fin.company_fundamentals WHERE symbol = ${sym}`;
+  const cached = check(await db.from("fin_company_fundamentals").select("metrics, status, fetched_at").eq("symbol", sym).maybeSingle(), "fundamentals_read") as any;
   if (cached && Date.now() - new Date(cached.fetched_at).getTime() < TTL_MS) {
     return { symbol: sym, status: cached.status, metrics: cached.metrics, fetchedAt: new Date(cached.fetched_at).toISOString() };
   }
@@ -60,10 +60,11 @@ export async function getCompanyFundamentals(tx: Tx, symbol: string): Promise<Fu
     result = { status: "unavailable", metrics: null, cik: null, name: null };
   }
 
-  await tx`INSERT INTO fin.company_fundamentals (symbol, cik, company_name, metrics, status, fetched_at)
-    VALUES (${sym}, ${result.cik}, ${result.name}, ${result.metrics ? tx.json(result.metrics) : null}, ${result.status}, now())
-    ON CONFLICT (symbol) DO UPDATE SET cik = EXCLUDED.cik, company_name = EXCLUDED.company_name,
-      metrics = EXCLUDED.metrics, status = EXCLUDED.status, fetched_at = now()`;
+  // Shared cache: written by the server only (signed-in users can read it, not change it).
+  check(await (await adminDb()).from("fin_company_fundamentals").upsert({
+    symbol: sym, cik: result.cik, company_name: result.name, metrics: (result.metrics ?? null) as never, status: result.status,
+    fetched_at: new Date().toISOString(),
+  }, { onConflict: "symbol" }), "fundamentals_write");
 
   return { symbol: sym, status: result.status, metrics: result.metrics, fetchedAt: new Date().toISOString() };
 }
