@@ -4,6 +4,7 @@ import { useDerived } from "@/store/useDerived";
 import { PageHeader, GlassCard, CardTitle, Note } from "@/components/common/Glass";
 import { Slider } from "@/components/ui/slider";
 import { EmergencyFundFields, GoalsFields } from "@/components/risk/RiskInputsForm";
+import { CsvMiniLink } from "@/components/common/CsvHelp";
 import { PrimaryRecommendationCard } from "@/components/score/PrimaryRecommendationCard";
 import { computeSavingsScenarios } from "@/lib/finance/savings";
 import { datasetCompleteMonths } from "@/lib/finance/dates";
@@ -51,8 +52,8 @@ function Savings() {
         <Note>Each scenario covers a different category, so the combined total doesn't double-count. Estimates assume baseline spending continues.</Note>
       </GlassCard>
       <div className="grid gap-6 lg:grid-cols-2">
-        <GlassCard><CardTitle>Emergency fund</CardTitle><EmergencyFundFields /><Note>Shared with Future risk inputs.</Note></GlassCard>
-        <GlassCard><CardTitle>Goals</CardTitle><GoalsFields /><Note>Shared with Future risk inputs.</Note></GlassCard>
+        <GlassCard><CardTitle right={<CsvMiniLink section="csv-risk-inputs" />}>Emergency fund</CardTitle><EmergencyFundFields /><Note>Shared with Future risk inputs — load them from the CSV in Settings.</Note></GlassCard>
+        <GlassCard><CardTitle right={<CsvMiniLink section="csv-risk-inputs" />}>Goals</CardTitle><GoalsFields /><Note>Shared with Future risk inputs — load them from the CSV in Settings.</Note></GlassCard>
       </div>
     </div>
   );

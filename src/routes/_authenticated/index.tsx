@@ -3,6 +3,7 @@ import { ChevronDown } from "lucide-react";
 import { useDerived } from "@/store/useDerived";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { PageHeader, GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
+import { CsvMiniLink } from "@/components/common/CsvHelp";
 import { Metric } from "@/components/common/Metric";
 import { InfoTip } from "@/components/common/InfoTip";
 import { HistoricalScoreCard } from "@/components/score/HistoricalScoreCard";

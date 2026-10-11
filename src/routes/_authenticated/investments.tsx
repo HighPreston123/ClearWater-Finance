@@ -1,11 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Download } from "lucide-react";
-import { Link } from "@tanstack/react-router";
-import { CsvSettingsLink } from "@/components/common/CsvHelp";
+import { CsvSettingsLink, CsvMiniLink } from "@/components/common/CsvHelp";
 import { useFinanceStore } from "@/store/FinanceStore";
 import { usePortfolio } from "@/store/useDerived";
 import { PageHeader, GlassCard, CardTitle, Note, StatusBadge } from "@/components/common/Glass";
-import { Button } from "@/components/ui/button";
 import { AllocationChart } from "@/components/investments/AllocationChart";
 import { MarketDataCard } from "@/components/investments/MarketDataCard";
 import { AccountCard } from "@/components/investments/AccountCard";
@@ -30,11 +27,7 @@ function Investments() {
   return (
     <div className="space-y-6">
       <PageHeader title="Investments" subtitle="Your accounts and holdings. Values reflect each displayed valuation date."
-        right={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="glass" asChild><Link to="/settings" hash="csv-holdings"><Download /> Import holdings</Link></Button>
-          </div>
-        } />
+        right={<CsvMiniLink section="csv-holdings" label="Import holdings CSV" />} />
       <CsvSettingsLink section="csv-holdings" title="Import your investments" text="Upload a brokerage CSV of your holdings in Settings. It explains each column and where to download it." />
       <GlassCard>
         <div className="flex flex-wrap items-end justify-between gap-3">
