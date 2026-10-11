@@ -1,12 +1,11 @@
-import { FEATURES } from "@/config/features";
-import { notConfigured, type ServiceResult } from "@/services/types";
-import type { InsightsRequest, InsightsResponse } from "./types";
+import { explainOverview } from "@/lib/insights.functions";
+import type { InsightPayload } from "@/lib/insights/payload";
+import type { ServiceResult } from "@/services/types";
+import type { InsightsResponse } from "./types";
 
-/**
- * Future: POST /api/insights (server route holds the AI provider key).
- * Not called until FEATURES.aiInsights is enabled and the route exists.
- */
-export async function requestInsights(_req: InsightsRequest): Promise<ServiceResult<InsightsResponse>> {
-  if (!FEATURES.aiInsights) return notConfigured("AI explanations");
-  return notConfigured("AI explanations");
+/** Calls the server function; the Gemini key never reaches the browser. */
+export async function requestInsights(payload: InsightPayload): Promise<ServiceResult<InsightsResponse> | { status: "error"; message: string }> {
+  const r = await explainOverview({ data: payload });
+  if (r.ok) return { status: "ok", data: { explanation: r.explanation, model: r.model, generatedAt: r.generatedAt } } as never;
+  return { status: "error", message: r.message };
 }
