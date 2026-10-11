@@ -36,8 +36,9 @@ export async function withOwner<T>(ownerId: string, fn: (tx: Tx) => Promise<T>):
   });
   try {
     return (await sql.begin(async (tx) => {
-      // One round trip: set_config('role', …, true) is SET LOCAL ROLE.
-      await tx`SELECT set_config('role', 'fin_app', true), set_config('app.user_id', ${ownerId}, true)`;
+      // One round trip: set_config('role', …, true) is SET LOCAL ROLE. The owner id is a validated UUID inlined
+      // as a literal — parameterized statements cost an extra describe round trip with prepare: false.
+      await tx.unsafe(`SELECT set_config('role', 'fin_app', true), set_config('app.user_id', '${ownerId}', true)`);
       return fn(tx);
     })) as T;
   } catch (e) {
