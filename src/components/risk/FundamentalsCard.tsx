@@ -6,6 +6,7 @@ import type { FundamentalsResult } from "@/lib/edgar.server";
 import { publishRiskResult } from "@/lib/risk/resultsStore";
 import { CardTitle, GlassCard, Kv, Note, StatusBadge } from "@/components/common/Glass";
 import { Button } from "@/components/ui/button";
+import { CsvMiniLink } from "@/components/common/CsvHelp";
 
 const pct = (x: number | null | undefined, d = 1) => (x === null || x === undefined || !Number.isFinite(x) ? "—" : `${(x * 100).toFixed(d)}%`);
 const money = (x: number | null | undefined) =>
@@ -38,10 +39,10 @@ export function FundamentalsCard() {
 
   return (
     <GlassCard>
-      <CardTitle right={<Button size="sm" onClick={go} disabled={busy || !symbols.length}>{busy ? "Loading…" : res ? "Refresh" : "Load fundamentals"}</Button>}>
+      <CardTitle right={<div className="flex flex-wrap items-center gap-2"><CsvMiniLink section="csv-holdings" label="Import holdings CSV" /><Button size="sm" onClick={go} disabled={busy || !symbols.length}>{busy ? "Loading…" : res ? "Refresh" : "Load fundamentals"}</Button></div>}>
         Company fundamentals
       </CardTitle>
-      {!symbols.length && <Note>Add stock holdings on the Investments page to see company fundamentals.</Note>}
+      {!symbols.length && <Note>Add stock holdings with your investments CSV to see company fundamentals.</Note>}
       {err && <Note>{err}</Note>}
       {res && (
         <div className="space-y-4">
