@@ -36,6 +36,9 @@ export const RecoveryEmail = ({
           Reset Password
         </Button>
         <Text style={footer}>
+          Button not working? Copy this link into your browser: {confirmationUrl}
+        </Text>
+        <Text style={footer}>
           If you didn't request a password reset, you can safely ignore this
           email. Your password will not be changed.
         </Text>
@@ -61,10 +64,10 @@ const text = {
   margin: '0 0 25px',
 }
 const button = {
-  backgroundColor: '#000000',
+  backgroundColor: '#1f6f9f',
   color: '#ffffff',
   fontSize: '14px',
-  border: '1px solid #000000',
+  border: '1px solid #1f6f9f',
   borderRadius: '8px',
   padding: '12px 20px',
   textDecoration: 'none',
@@ -73,8 +76,8 @@ const footer = { fontSize: '12px', color: '#999999', margin: '30px 0 0' }
 // Rendered as a text child, which React may HTML-escape: keep this CSS free of >, &, and quotes.
 const darkModeCss = `
   @media (prefers-color-scheme: dark) {
-    .dm-btn { background-color: #ffffff !important; color: #000000 !important; }
+    .dm-btn { background-color: #5fb0dc !important; color: #ffffff !important; }
   }
-  [data-ogsc] .dm-btn { background-color: #ffffff !important; color: #000000 !important; }
-  [data-ogsb] .dm-btn { background-color: #ffffff !important; color: #000000 !important; }
+  [data-ogsc] .dm-btn { background-color: #5fb0dc !important; color: #ffffff !important; }
+  [data-ogsb] .dm-btn { background-color: #5fb0dc !important; color: #ffffff !important; }
 `
