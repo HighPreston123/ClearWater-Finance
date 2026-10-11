@@ -66,9 +66,18 @@ function Overview() {
         <HistoricalScoreCard score={d.score} compact />
         <div className="space-y-6">
           <GlassCard>
-            <CardTitle info={<InfoTip title="Overall wellness score" means="Will combine your historical cash-flow score with future risk." calc="Formula not yet defined by the team." excludes="Everything until future risk is implemented." />}>Overall wellness score</CardTitle>
-            <p className="font-display text-2xl font-extrabold text-muted-foreground">{d.wellness.status === "not_available" ? d.wellness.message : "—"}</p>
-            <Note>Future risk is not calculated until its methodology is implemented.</Note>
+            <CardTitle info={<InfoTip title="Future Resilience Score" means="How close you are to your goals and how well you would survive a shock, 0–100." calc="Five weighted pillars (liquidity 25%, cash flow 20%, debt 15%, goals & retirement 25%, portfolio 15%), capped by survival gates." excludes="Company fundamentals. Unknown inputs are never counted as zero; they lower confidence instead." />}>Future Resilience Score</CardTitle>
+            {d.wellness.status === "ok" ? (
+              <>
+                <p className="font-display text-4xl font-extrabold text-foreground">{String(d.wellness.value)}<span className="text-base text-muted-foreground"> / 100</span></p>
+                <Note>{d.wellness.label}. Shown alongside your financial wellness score on the Future risk page.</Note>
+              </>
+            ) : (
+              <>
+                <p className="font-display text-2xl font-extrabold text-muted-foreground">{d.wellness.message}</p>
+                <Note>{d.wellness.reason}</Note>
+              </>
+            )}
           </GlassCard>
           <FutureRiskPanel risk={d.risk} compact />
         </div>
