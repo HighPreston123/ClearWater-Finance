@@ -704,6 +704,41 @@ export type Database = {
         }
         Relationships: []
       }
+      fin_user_need_categories: {
+        Row: {
+          assessment_version: string | null
+          assigned_at: string
+          category_code: string
+          kind: string
+          source: string
+          user_id: string
+        }
+        Insert: {
+          assessment_version?: string | null
+          assigned_at?: string
+          category_code: string
+          kind?: string
+          source: string
+          user_id: string
+        }
+        Update: {
+          assessment_version?: string | null
+          assigned_at?: string
+          category_code?: string
+          kind?: string
+          source?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fin_user_need_categories_category_code_fkey"
+            columns: ["category_code"]
+            isOneToOne: false
+            referencedRelation: "fin_financial_categories"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
       fin_user_profiles: {
         Row: {
           auth_user_id: string
