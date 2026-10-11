@@ -285,6 +285,7 @@ export function computeResilience(input: ResilienceInputs, adj: Adjust = {}): Re
   // coverage & confidence
   let tot = 0, cov = 0;
   for (const id of Object.keys(all) as PillarId[]) for (const sm of all[id]) {
+    if (sm.weight === 0) continue;
     const w = PILLAR_WEIGHTS[id] * sm.weight; tot += w;
     if (sm.points !== null) cov += w; else unknowns.push(`${PILLAR_LABELS[id]}: ${sm.label}`);
   }
