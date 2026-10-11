@@ -1,24 +1,10 @@
-# FINALFINAL
-
-Implement exactly the screenshot and nothing else
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/7d5454b4-4117-4b26-94de-325295d25d8b).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+# ClearWater
+AI SOURCES: 
+PromptLab (UNC)
+ChatGPT 5.6 Luna (creating the prompt based on ideas)
+ChatGPT 5.6 Luna (again, to create a fake bank account CSV)
+Gemini 3 (To search stuff up on Google)
+ChatGPT Astra (used to create prompt for Lovable)
+Lovable (front-end design and basic website creation)
+Attempted to use TigerCloud to create a database but was not very compatible with Lovable, so it was not used in final product
+Claude Sonnet 5.5 for CSV files
