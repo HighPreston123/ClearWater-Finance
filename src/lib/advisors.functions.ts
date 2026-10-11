@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { sanitizeSurveyAnswers } from "@/lib/risk/survey";
@@ -19,24 +20,18 @@ export const getAdvisorMatches = createServerFn({ method: "POST" })
   .handler(async ({ context }): Promise<AdvisorMatchResponse> => {
     const { assertMfa } = await import("./mfa.server");
     await assertMfa(context);
-    const { withOwner } = await import("./tiger.server");
-    return withOwner(context.userId, async (tx) => {
-      const [survey] = await tx<any[]>`SELECT answers FROM fin.risk_survey WHERE user_id = ${context.userId}`;
+    const { check } = await import("./db.server");
+    const db = context.supabase;
+    {
+      const survey = check(await db.from("fin_risk_survey").select("answers").eq("user_id", context.userId).maybeSingle(), "survey_read") as any;
       if (!survey) return { status: "no_survey", userCategories: [], categoryLabels: {}, matches: [] };
       const userCategories = deriveUserCategories(sanitizeSurveyAnswers(survey.answers));
 
-      const labels = await tx<any[]>`SELECT code, label FROM fin.financial_categories`;
+      const labels = (check(await db.from("fin_financial_categories").select("code, label"), "categories_read") ?? []) as any[];
       const categoryLabels = Object.fromEntries(labels.map((r) => [r.code, r.label]));
 
-      const advisors = await tx<any[]>`
-        SELECT a.id, a.full_name, a.title, a.biography, a.experience, a.education,
-               a.certifications, a.strengths, a.advisory_style, a.best_suited_for, a.meeting_format,
-               coalesce(json_agg(json_build_object('code', c.category_code, 'role', c.role))
-                        FILTER (WHERE c.category_code IS NOT NULL), '[]') AS categories
-        FROM fin.advisors a
-        LEFT JOIN fin.advisor_categories c ON c.advisor_id = a.id
-        WHERE a.is_active
-        GROUP BY a.id`;
+      const rows = (check(await db.from("fin_advisors").select("id, full_name, title, biography, experience, education, certifications, strengths, advisory_style, best_suited_for, meeting_format, fin_advisor_categories(category_code, role)").eq("is_active", true), "advisors_read") ?? []) as any[];
+      const advisors = rows.map((r) => ({ ...r, categories: (r.fin_advisor_categories ?? []).map((c: any) => ({ code: c.category_code, role: c.role })) }));
       const records = advisors.map((r) => ({
         id: r.id,
         fullName: r.full_name,
@@ -59,5 +54,5 @@ export const getAdvisorMatches = createServerFn({ method: "POST" })
         categoryLabels,
         matches,
       };
-    });
+    }
   });
