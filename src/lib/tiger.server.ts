@@ -87,7 +87,8 @@ export async function readOwnerState(ownerId: string): Promise<PersistedState | 
     const results = (await sql.unsafe(
       `BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY; SET LOCAL ROLE fin_app; SELECT set_config('app.user_id', '${ownerId}', true); ${stateSql(ownerId)}; COMMIT;`,
     ).simple()) as unknown as any[][];
-    return mapState(results[3]?.[0]);
+    // Pick the combined read's result by shape (statement results without rows may be omitted).
+    return mapState(results.find((r) => r?.[0] && "settings" in r[0])?.[0]);
   } catch (e) {
     const err = e as { code?: string; message?: string };
     console.error("[tiger] query failed", err.code ?? "", String(err.message ?? "").replace(/postgres(ql)?:\/\/\S+/g, "[redacted]"));
