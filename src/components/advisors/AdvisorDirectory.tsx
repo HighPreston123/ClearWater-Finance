@@ -8,14 +8,22 @@ import type { AdvisorRecord } from "@/lib/reference.server";
 
 const FORMAT: Record<string, string> = { virtual: "Virtual", in_person: "In person", hybrid: "Hybrid" };
 
+// Reference data: kept for the whole session so revisiting Advisors is instant.
+let directoryCache: Promise<AdvisorRecord[] | null> | null = null;
+const loadDirectory = () =>
+  (directoryCache ??= listAdvisorRecords()
+    .then((r) => (r.status === "ok" && r.data.length ? r.data : null))
+    .catch((e) => { directoryCache = null; throw e; }));
+
 export function AdvisorDirectory() {
   const [records, setRecords] = useState<AdvisorRecord[] | null>(null);
   const [fallback, setFallback] = useState<AdvisorProfile[] | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   useEffect(() => {
     // Persisted directory first; legacy providers only if the database is unreachable.
-    listAdvisorRecords().then(async (r) => {
-      if (r.status === "ok" && r.data.length) return setRecords(r.data);
+    loadDirectory().then(async (data) => {
+      if (data) return setRecords(data);
+      directoryCache = null;
       const n = await getAdvisorProvider("nessie").listAdvisors();
       if (n.status === "ok" && n.data.length) return setFallback(n.data);
       const s = await getAdvisorProvider("sample").listAdvisors();

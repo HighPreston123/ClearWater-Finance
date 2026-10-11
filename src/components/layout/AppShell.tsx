@@ -1,4 +1,4 @@
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, type ReactNode } from "react";
@@ -87,8 +87,21 @@ function UserChip() {
   );
 }
 
+/** After the first page shows, quietly download every tab's code so first clicks are instant. */
+function useWarmTabs() {
+  const router = useRouter();
+  useEffect(() => {
+    // Tab pages have no data loaders, so preloading only fetches their code.
+    const t = setTimeout(() => {
+      for (const { to } of NAV) router.preloadRoute({ to }).catch(() => {});
+    }, 1200);
+    return () => clearTimeout(t);
+  }, [router]);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  useWarmTabs();
   return (
     <div className="aero-sky bubbles min-h-screen">
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-full focus:bg-card focus:px-4 focus:py-2">Skip to content</a>
