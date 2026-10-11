@@ -17,7 +17,7 @@ const schema = z.object({
   mainRecommendation: z.object({ title: z.string().max(200), detail: z.string().max(800), nextStep: z.string().max(500) }),
 });
 
-const MODEL = "gemini-2.5-flash";
+const MODEL = "gemini-3.8-flash";
 const recent = new Map<string, number[]>();
 const LIMIT = 6; // per user per 10 minutes (best-effort, per server instance)
 
