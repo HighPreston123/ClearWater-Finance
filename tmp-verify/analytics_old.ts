@@ -1,9 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Transaction } from "@/types/finance";
 import { withOwner, refreshOwnerAnalytics } from "./tiger_old";
-import { compareCategories, lastTwoComplete, toPeriods, whatChanged, type BucketRow, type CategoryComparison, type TrendPeriod } from "./finance/trends";
-import { assessAllMonths, isReconstructed, SCORE_METHODOLOGY_VERSION, SCORE_TYPE } from "./finance/scoreHistory";
-import type { ScoreFactor } from "./finance/score";
+import { compareCategories, lastTwoComplete, toPeriods, whatChanged, type BucketRow, type CategoryComparison, type TrendPeriod } from "@/lib/finance/trends";
+import { assessAllMonths, isReconstructed, SCORE_METHODOLOGY_VERSION, SCORE_TYPE } from "@/lib/finance/scoreHistory";
+import type { ScoreFactor } from "@/lib/finance/score";
 
 /** Server-only analytics over TigerData. Every function takes the VERIFIED owner id. */
 
